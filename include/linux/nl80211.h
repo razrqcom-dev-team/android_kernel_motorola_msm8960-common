@@ -2847,4 +2847,6 @@ enum nl80211_acl_policy {
 	NL80211_ACL_POLICY_DENY_UNLESS_LISTED,
 };
 
+=======
+>>>>>>> c75786c... nl80211/cfg80211: add STA WME parameters
 #endif /* __LINUX_NL80211_H */
