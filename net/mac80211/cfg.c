@@ -2495,7 +2495,7 @@ static int ieee80211_tdls_oper(struct wiphy *wiphy, struct net_device *dev,
 			return -ENOLINK;
 		}
 
-		set_sta_flag(sta, WLAN_STA_TDLS_PEER_AUTH);
+		set_sta_flags(sta, WLAN_STA_TDLS_PEER_AUTH);
 		rcu_read_unlock();
 		break;
 	case NL80211_TDLS_DISABLE_LINK:
