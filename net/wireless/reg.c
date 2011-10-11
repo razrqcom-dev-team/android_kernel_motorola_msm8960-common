@@ -1157,6 +1157,8 @@ void wiphy_update_regulatory(struct wiphy *wiphy,
 	if (ignore_reg_update(wiphy, initiator))
 		return;
 
+	last_request->dfs_region = cfg80211_regdomain->dfs_region;
+
 	for (band = 0; band < IEEE80211_NUM_BANDS; band++) {
 		if (wiphy->bands[band])
 			handle_band(wiphy, band, initiator);
