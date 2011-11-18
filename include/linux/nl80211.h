@@ -540,6 +540,9 @@
  *	OLBC handling in hostapd. Beacons are reported in %NL80211_CMD_FRAME
  *	messages. Note that per PHY only one application may register.
  *
+ * @NL80211_CMD_SET_NOACK_MAP: sets a bitmap for the individual TIDs whether
+ *      No Acknowledgement Policy should be applied.
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -679,6 +682,7 @@ enum nl80211_commands {
 
 	NL80211_CMD_SET_NOACK_MAP,
 
+<<<<<<< HEAD
 
 	NL80211_CMD_CH_SWITCH_NOTIFY,
 
@@ -701,6 +705,8 @@ enum nl80211_commands {
 	NL80211_CMD_CRIT_PROTOCOL_START,
 	NL80211_CMD_CRIT_PROTOCOL_STOP,
 
+=======
+>>>>>>> 1d9d921... wireless: Add NoAck per tid support
 	/* add new commands above here */
 
 	/* used to define NL80211_CMD_MAX below */
@@ -1212,6 +1218,9 @@ enum nl80211_commands {
  *    abides to when initiating radiation on DFS channels. A country maps
  *    to one DFS region.
  *
+ * @NL80211_ATTR_NOACK_MAP: This u16 bitmap contains the No Ack Policy of
+ *      up to 16 TIDs.
+ *
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
  */
@@ -1457,6 +1466,7 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_NOACK_MAP,
 
+<<<<<<< HEAD
 	NL80211_ATTR_INACTIVITY_TIMEOUT,
 
 	NL80211_ATTR_RX_SIGNAL_DBM,
@@ -1512,6 +1522,8 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_PEER_AID,
 
+=======
+>>>>>>> 1d9d921... wireless: Add NoAck per tid support
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,

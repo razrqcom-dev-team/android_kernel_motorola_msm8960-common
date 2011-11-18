@@ -1483,6 +1483,8 @@ struct cfg80211_gtk_rekey_data {
  *
  * @probe_client: probe an associated client, must return a cookie that it
  *	later passes to cfg80211_probe_status().
+ *
+ * @set_noack_map: Set the NoAck Map for the TIDs.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -1678,6 +1680,10 @@ struct cfg80211_ops {
 
 	int	(*probe_client)(struct wiphy *wiphy, struct net_device *dev,
 				const u8 *peer, u64 *cookie);
+
+	int	(*set_noack_map)(struct wiphy *wiphy,
+				  struct net_device *dev,
+				  u16 noack_map);
 };
 
 /*
