@@ -1160,6 +1160,7 @@ struct cfg80211_ibss_params {
 	u8 *ssid;
 	u8 *bssid;
 	struct ieee80211_channel *channel;
+	enum nl80211_channel_type channel_type;
 	u8 *ie;
 	u8 ssid_len, ie_len;
 	u16 beacon_interval;
@@ -3366,6 +3367,15 @@ void cfg80211_report_obss_beacon(struct wiphy *wiphy,
 				 const u8 *frame, size_t len,
 				 int freq, gfp_t gfp);
 
+/*
+ * cfg80211_can_beacon_sec_chan - test if ht40 on extension channel can be used
+ * @wiphy: the wiphy
+ * @chan: main channel
+ * @channel_type: HT mode
+ */
+int cfg80211_can_beacon_sec_chan(struct wiphy *wiphy,
+				 struct ieee80211_channel *chan,
+				 enum nl80211_channel_type channel_type);
 
 /**
  * cfg80211_ap_stopped - notify userspace that AP mode stopped
