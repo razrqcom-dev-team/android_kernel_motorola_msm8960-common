@@ -340,7 +340,9 @@ static void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo)
 			STATION_INFO_RX_BITRATE |
 			STATION_INFO_RX_DROP_MISC |
 			STATION_INFO_BSS_PARAM |
-			STATION_INFO_CONNECTED_TIME;
+			STATION_INFO_CONNECTED_TIME |
+			STATION_INFO_STA_FLAGS |
+			STATION_INFO_BEACON_LOSS_COUNT;
 
 	do_posix_clock_monotonic_gettime(&uptime);
 	sinfo->connected_time = uptime.tv_sec - sta->last_connected;
@@ -353,6 +355,7 @@ static void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo)
 	sinfo->tx_retries = sta->tx_retry_count;
 	sinfo->tx_failed = sta->tx_retry_failed;
 	sinfo->rx_dropped_misc = sta->rx_dropped;
+	sinfo->beacon_loss_count = sta->beacon_loss_count;
 
 	if ((sta->local->hw.flags & IEEE80211_HW_SIGNAL_DBM) ||
 	    (sta->local->hw.flags & IEEE80211_HW_SIGNAL_UNSPEC)) {
@@ -2607,12 +2610,9 @@ struct cfg80211_ops mac80211_config_ops = {
 	.get_antenna = ieee80211_get_antenna,
 	.set_ringparam = ieee80211_set_ringparam,
 	.get_ringparam = ieee80211_get_ringparam,
-<<<<<<< HEAD
-=======
 	.set_rekey_data = ieee80211_set_rekey_data,
 	.tdls_oper = ieee80211_tdls_oper,
 	.tdls_mgmt = ieee80211_tdls_mgmt,
 	.probe_client = ieee80211_probe_client,
 	.get_channel = ieee80211_wiphy_get_channel,
->>>>>>> e999882... mac80211/cfg80211: report monitor channel in wireless extensions
 };
