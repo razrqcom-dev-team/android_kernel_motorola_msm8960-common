@@ -282,6 +282,112 @@ static void rate_idx_match_mask(struct ieee80211_tx_rate *rate,
 		if (mask & (1 << j)) {
 			/* Okay, found a suitable rate. Use it. */
 			rate->idx = j;
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool rate_idx_match_mcs_mask(struct ieee80211_tx_rate *rate,
+				    u8 mcs_mask[IEEE80211_HT_MCS_MASK_LEN])
+{
+	int i, j;
+	int ridx, rbit;
+
+	ridx = rate->idx / 8;
+	rbit = rate->idx % 8;
+
+	/* sanity check */
+	if (ridx < 0 || ridx >= IEEE80211_HT_MCS_MASK_LEN)
+		return false;
+
+	/* See whether the selected rate or anything below it is allowed. */
+	for (i = ridx; i >= 0; i--) {
+		for (j = rbit; j >= 0; j--)
+			if (mcs_mask[i] & BIT(j)) {
+				rate->idx = i * 8 + j;
+				return true;
+			}
+		rbit = 7;
+	}
+
+	/* Try to find a higher rate that would be allowed */
+	ridx = (rate->idx + 1) / 8;
+	rbit = (rate->idx + 1) % 8;
+
+	for (i = ridx; i < IEEE80211_HT_MCS_MASK_LEN; i++) {
+		for (j = rbit; j < 8; j++)
+			if (mcs_mask[i] & BIT(j)) {
+				rate->idx = i * 8 + j;
+				return true;
+			}
+		rbit = 0;
+	}
+	return false;
+}
+
+
+
+static void rate_idx_match_mask(struct ieee80211_tx_rate *rate,
+				struct ieee80211_tx_rate_control *txrc,
+				u32 mask,
+				u8 mcs_mask[IEEE80211_HT_MCS_MASK_LEN])
+{
+	struct ieee80211_tx_rate alt_rate;
+
+	/* handle HT rates */
+	if (rate->flags & IEEE80211_TX_RC_MCS) {
+		if (rate_idx_match_mcs_mask(rate, mcs_mask))
+			return;
+
+		/* also try the legacy rates. */
+		alt_rate.idx = 0;
+		/* keep protection flags */
+		alt_rate.flags = rate->flags &
+				 (IEEE80211_TX_RC_USE_RTS_CTS |
+				  IEEE80211_TX_RC_USE_CTS_PROTECT |
+				  IEEE80211_TX_RC_USE_SHORT_PREAMBLE);
+		alt_rate.count = rate->count;
+		if (rate_idx_match_legacy_mask(&alt_rate,
+					       txrc->sband->n_bitrates,
+					       mask)) {
+			*rate = alt_rate;
+			return;
+		}
+	} else {
+		struct sk_buff *skb = txrc->skb;
+		struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
+		__le16 fc;
+
+		/* handle legacy rates */
+		if (rate_idx_match_legacy_mask(rate, txrc->sband->n_bitrates,
+					       mask))
+			return;
+
+		/* if HT BSS, and we handle a data frame, also try HT rates */
+		if (txrc->bss_conf->channel_type == NL80211_CHAN_NO_HT)
+			return;
+
+		fc = hdr->frame_control;
+		if (!ieee80211_is_data(fc))
+			return;
+
+		alt_rate.idx = 0;
+		/* keep protection flags */
+		alt_rate.flags = rate->flags &
+				 (IEEE80211_TX_RC_USE_RTS_CTS |
+				  IEEE80211_TX_RC_USE_CTS_PROTECT |
+				  IEEE80211_TX_RC_USE_SHORT_PREAMBLE);
+		alt_rate.count = rate->count;
+
+		alt_rate.flags |= IEEE80211_TX_RC_MCS;
+
+		if ((txrc->bss_conf->channel_type == NL80211_CHAN_HT40MINUS) ||
+		    (txrc->bss_conf->channel_type == NL80211_CHAN_HT40PLUS))
+			alt_rate.flags |= IEEE80211_TX_RC_40_MHZ_WIDTH;
+
+		if (rate_idx_match_mcs_mask(&alt_rate, mcs_mask)) {
+			*rate = alt_rate;
 			return;
 		}
 	}
