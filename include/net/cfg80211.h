@@ -368,6 +368,39 @@ struct cfg80211_crypto_settings {
 	bool control_port_no_encrypt;
 };
 
+/**
+ * struct cfg80211_beacon_data - beacon data
+ * @head: head portion of beacon (before TIM IE)
+ *     or %NULL if not changed
+ * @tail: tail portion of beacon (after TIM IE)
+ *     or %NULL if not changed
+ * @head_len: length of @head
+ * @tail_len: length of @tail
+ * @beacon_ies: extra information element(s) to add into Beacon frames or %NULL
+ * @beacon_ies_len: length of beacon_ies in octets
+ * @proberesp_ies: extra information element(s) to add into Probe Response
+ *	frames or %NULL
+ * @proberesp_ies_len: length of proberesp_ies in octets
+ * @assocresp_ies: extra information element(s) to add into (Re)Association
+ *	Response frames or %NULL
+ * @assocresp_ies_len: length of assocresp_ies in octets
+ * @probe_resp_len: length of probe response template (@probe_resp)
+ * @probe_resp: probe response template (AP mode only)
+ */
+struct cfg80211_beacon_data {
+	const u8 *head, *tail;
+	const u8 *beacon_ies;
+	const u8 *proberesp_ies;
+	const u8 *assocresp_ies;
+	const u8 *probe_resp;
+
+	size_t head_len, tail_len;
+	size_t beacon_ies_len;
+	size_t proberesp_ies_len;
+	size_t assocresp_ies_len;
+	size_t probe_resp_len;
+};
+
 struct mac_address {
 	u8 addr[ETH_ALEN];
 };
@@ -389,18 +422,13 @@ struct cfg80211_acl_data {
 };
 
 /**
- * struct beacon_parameters - beacon parameters
+ * struct cfg80211_ap_settings - AP configuration
  *
- * Used to configure the beacon for an interface.
+ * Used to configure an AP interface.
  *
- * @head: head portion of beacon (before TIM IE)
- *     or %NULL if not changed
- * @tail: tail portion of beacon (after TIM IE)
- *     or %NULL if not changed
- * @interval: beacon interval or zero if not changed
- * @dtim_period: DTIM period or zero if not changed
- * @head_len: length of @head
- * @tail_len: length of @tail
+ * @beacon: beacon data
+ * @beacon_interval: beacon interval
+ * @dtim_period: DTIM period
  * @ssid: SSID to be used in the BSS (note: may be %NULL if not provided from
  *	user space)
  * @ssid_len: length of @ssid
@@ -408,37 +436,19 @@ struct cfg80211_acl_data {
  * @crypto: crypto settings
  * @privacy: the BSS uses privacy
  * @auth_type: Authentication type (algorithm)
- * @beacon_ies: extra information element(s) to add into Beacon frames or %NULL
- * @beacon_ies_len: length of beacon_ies in octets
- * @proberesp_ies: extra information element(s) to add into Probe Response
- *	frames or %NULL
- * @proberesp_ies_len: length of proberesp_ies in octets
- * @assocresp_ies: extra information element(s) to add into (Re)Association
- *	Response frames or %NULL
- * @assocresp_ies_len: length of assocresp_ies in octets
- * @probe_resp_len: length of probe response template (@probe_resp)
- * @probe_resp: probe response template (AP mode only)
  * @acl: ACL configuration used by the drivers which has support for
  *	MAC address based access control
  */
-struct beacon_parameters {
-	u8 *head, *tail;
-	int interval, dtim_period;
-	int head_len, tail_len;
+struct cfg80211_ap_settings {
+	struct cfg80211_beacon_data beacon;
+
+	int beacon_interval, dtim_period;
 	const u8 *ssid;
 	size_t ssid_len;
 	enum nl80211_hidden_ssid hidden_ssid;
 	struct cfg80211_crypto_settings crypto;
 	bool privacy;
 	enum nl80211_auth_type auth_type;
-	const u8 *beacon_ies;
-	size_t beacon_ies_len;
-	const u8 *proberesp_ies;
-	size_t proberesp_ies_len;
-	const u8 *assocresp_ies;
-	size_t assocresp_ies_len;
-	int probe_resp_len;
-	u8 *probe_resp;
 	const struct cfg80211_acl_data *acl;
 };
 
@@ -1486,13 +1496,6 @@ struct cfg80211_gtk_rekey_data {
  *
  * @get_ringparam: Get tx and rx ring current and maximum sizes.
  *
- * @set_mac_acl: Sets MAC address control list in AP and P2P GO mode.
- *	Parameters include ACL policy, an array of MAC address of stations
- *	and the number of MAC addresses. If there is already a list in driver
- *	this new list replaces the existing one. Driver has to clear its ACL
- *	when number of MAC addresses entries is passed as 0. Drivers which
- *	advertise the support for MAC based ACL have to implement this callback.
- *
  * @tdls_mgmt: Transmit a TDLS management frame.
  * @tdls_oper: Perform a high-level TDLS operation (e.g. TDLS link setup).
  *
@@ -1500,6 +1503,13 @@ struct cfg80211_gtk_rekey_data {
  *	later passes to cfg80211_probe_status().
  *
  * @set_noack_map: Set the NoAck Map for the TIDs.
+ * @set_mac_acl: Sets MAC address control list in AP and P2P GO mode.
+ *	Parameters include ACL policy, an array of MAC address of stations
+ *	and the number of MAC addresses. If there is already a list in driver
+ *	this new list replaces the existing one. Driver has to clear its ACL
+ *	when number of MAC addresses entries is passed as 0. Drivers which
+ *	advertise the support for MAC based ACL have to implement this callback.
+ *
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -1532,11 +1542,11 @@ struct cfg80211_ops {
 					struct net_device *netdev,
 					u8 key_index);
 
-	int	(*add_beacon)(struct wiphy *wiphy, struct net_device *dev,
-			      struct beacon_parameters *info);
-	int	(*set_beacon)(struct wiphy *wiphy, struct net_device *dev,
-			      struct beacon_parameters *info);
-	int	(*del_beacon)(struct wiphy *wiphy, struct net_device *dev);
+	int	(*start_ap)(struct wiphy *wiphy, struct net_device *dev,
+			    struct cfg80211_ap_settings *settings);
+	int	(*change_beacon)(struct wiphy *wiphy, struct net_device *dev,
+				 struct cfg80211_beacon_data *info);
+	int	(*stop_ap)(struct wiphy *wiphy, struct net_device *dev);
 
 
 	int	(*add_station)(struct wiphy *wiphy, struct net_device *dev,
@@ -1681,9 +1691,6 @@ struct cfg80211_ops {
 				struct cfg80211_sched_scan_request *request);
 	int	(*sched_scan_stop)(struct wiphy *wiphy, struct net_device *dev);
 
-	int	(*set_mac_acl)(struct wiphy *wiphy, struct net_device *dev,
-				const struct cfg80211_acl_data *params);
-
 	int	(*set_rekey_data)(struct wiphy *wiphy, struct net_device *dev,
 				  struct cfg80211_gtk_rekey_data *data);
 
@@ -1701,6 +1708,9 @@ struct cfg80211_ops {
 				  u16 noack_map);
 
 	struct ieee80211_channel *(*get_channel)(struct wiphy *wiphy);
+
+	int	(*set_mac_acl)(struct wiphy *wiphy, struct net_device *dev,
+				const struct cfg80211_acl_data *params);
 };
 
 /*

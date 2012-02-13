@@ -156,14 +156,23 @@
  * @NL80211_CMD_DEL_KEY: delete a key identified by %NL80211_ATTR_KEY_IDX
  *	or %NL80211_ATTR_MAC.
  *
- * @NL80211_CMD_GET_BEACON: retrieve beacon information (returned in a
- *	%NL80222_CMD_NEW_BEACON message)
- * @NL80211_CMD_SET_BEACON: set the beacon on an access point interface
- *	using the %NL80211_ATTR_BEACON_INTERVAL, %NL80211_ATTR_DTIM_PERIOD,
- *	%NL80211_ATTR_BEACON_HEAD and %NL80211_ATTR_BEACON_TAIL attributes.
- * @NL80211_CMD_NEW_BEACON: add a new beacon to an access point interface,
- *	parameters are like for %NL80211_CMD_SET_BEACON.
- * @NL80211_CMD_DEL_BEACON: remove the beacon, stop sending it
+ * @NL80211_CMD_GET_BEACON: (not used)
+ * @NL80211_CMD_SET_BEACON: change the beacon on an access point interface
+ *	using the %NL80211_ATTR_BEACON_HEAD and %NL80211_ATTR_BEACON_TAIL
+ *	attributes. For drivers that generate the beacon and probe responses
+ *	internally, the following attributes must be provided: %NL80211_ATTR_IE,
+ *	%NL80211_ATTR_IE_PROBE_RESP and %NL80211_ATTR_IE_ASSOC_RESP.
+ * @NL80211_CMD_START_AP: Start AP operation on an AP interface, parameters
+ *	are like for %NL80211_CMD_SET_BEACON, and additionally parameters that
+ *	do not change are used, these include %NL80211_ATTR_BEACON_INTERVAL,
+ *	%NL80211_ATTR_DTIM_PERIOD, %NL80211_ATTR_SSID,
+ *	%NL80211_ATTR_HIDDEN_SSID, %NL80211_ATTR_CIPHERS_PAIRWISE,
+ *	%NL80211_ATTR_CIPHER_GROUP, %NL80211_ATTR_WPA_VERSIONS,
+ *	%NL80211_ATTR_AKM_SUITES, %NL80211_ATTR_PRIVACY and
+ *	%NL80211_ATTR_AUTH_TYPE.
+ * @NL80211_CMD_NEW_BEACON: old alias for %NL80211_CMD_START_AP
+ * @NL80211_CMD_STOP_AP: Stop AP operation on the given interface
+ * @NL80211_CMD_DEL_BEACON: old alias for %NL80211_CMD_STOP_AP
  *
  * @NL80211_CMD_GET_STATION: Get station attributes for station identified by
  *	%NL80211_ATTR_MAC on the interface identified by %NL80211_ATTR_IFINDEX.
@@ -567,8 +576,10 @@ enum nl80211_commands {
 
 	NL80211_CMD_GET_BEACON,
 	NL80211_CMD_SET_BEACON,
-	NL80211_CMD_NEW_BEACON,
-	NL80211_CMD_DEL_BEACON,
+	NL80211_CMD_START_AP,
+	NL80211_CMD_NEW_BEACON = NL80211_CMD_START_AP,
+	NL80211_CMD_STOP_AP,
+	NL80211_CMD_DEL_BEACON = NL80211_CMD_STOP_AP,
 
 	NL80211_CMD_GET_STATION,
 	NL80211_CMD_SET_STATION,
@@ -682,8 +693,6 @@ enum nl80211_commands {
 
 	NL80211_CMD_SET_NOACK_MAP,
 
-<<<<<<< HEAD
-
 	NL80211_CMD_CH_SWITCH_NOTIFY,
 
 	NL80211_CMD_START_P2P_DEVICE,
@@ -705,8 +714,6 @@ enum nl80211_commands {
 	NL80211_CMD_CRIT_PROTOCOL_START,
 	NL80211_CMD_CRIT_PROTOCOL_STOP,
 
-=======
->>>>>>> 1d9d921... wireless: Add NoAck per tid support
 	/* add new commands above here */
 
 	/* used to define NL80211_CMD_MAX below */
@@ -1466,7 +1473,6 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_NOACK_MAP,
 
-<<<<<<< HEAD
 	NL80211_ATTR_INACTIVITY_TIMEOUT,
 
 	NL80211_ATTR_RX_SIGNAL_DBM,
@@ -1522,8 +1528,6 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_PEER_AID,
 
-=======
->>>>>>> 1d9d921... wireless: Add NoAck per tid support
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,
@@ -2911,7 +2915,7 @@ enum nl80211_connect_failed_reason {
  * enum nl80211_acl_policy - access control policy
  *
  * Access control policy is applied on a MAC list set by
- * %NL80211_CMD_NEW_BEACON and %NL80211_CMD_SET_MAC_ACL, to
+ * %NL80211_CMD_START_AP and %NL80211_CMD_SET_MAC_ACL, to
  * be used with %NL80211_ATTR_ACL_POLICY.
  *
  * @NL80211_ACL_POLICY_ACCEPT_UNLESS_LISTED: Deny stations which are
