@@ -436,6 +436,7 @@ struct cfg80211_acl_data {
  * @crypto: crypto settings
  * @privacy: the BSS uses privacy
  * @auth_type: Authentication type (algorithm)
+ * @inactivity_timeout: time in seconds to determine station's inactivity.
  * @acl: ACL configuration used by the drivers which has support for
  *	MAC address based access control
  */
@@ -449,6 +450,7 @@ struct cfg80211_ap_settings {
 	struct cfg80211_crypto_settings crypto;
 	bool privacy;
 	enum nl80211_auth_type auth_type;
+	int inactivity_timeout;
 	const struct cfg80211_acl_data *acl;
 };
 
