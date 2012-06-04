@@ -228,7 +228,7 @@
 #define VIDC_SM_H264_ASPECT_RATIO_INFO_SHFT          4
 #define VIDC_SM_EXTENDED_PAR_ADDR                    0x00cc
 #define VIDC_SM_EXTENDED_PAR_WIDTH_BMSK              0xffff0000
-#define VIDC_SM_EXTENDED_PAR_WIDTH_SHFT              0xf
+#define VIDC_SM_EXTENDED_PAR_WIDTH_SHFT              16
 #define VIDC_SM_EXTENDED_PAR_HEIGHT_BMSK             0x0000ffff
 #define VIDC_SM_EXTENDED_PAR_HEIGHT_SHFT             0x0
 
