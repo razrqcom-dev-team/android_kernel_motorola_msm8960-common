@@ -16,7 +16,6 @@
 #include "vcd_ddl_shared_mem.h"
 #include "vcd_res_tracker_api.h"
 
-
 struct ddl_context *ddl_get_context(void)
 {
 	static struct ddl_context ddl_context;
