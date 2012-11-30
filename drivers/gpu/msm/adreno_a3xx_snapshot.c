@@ -277,6 +277,9 @@ void *a3xx_snapshot(struct adreno_device *adreno_dev, void *snapshot,
 	list.registers = &regs;
 	list.count = 1;
 
+	/* Disable Clock gating temporarily for the debug bus to work */
+	adreno_regwrite(device, A3XX_RBBM_CLOCK_CTL, 0x00);
+
 	/* Master set of (non debug) registers */
 	snapshot = kgsl_snapshot_add_section(device,
 		KGSL_SNAPSHOT_SECTION_REGS, snapshot, remain,
