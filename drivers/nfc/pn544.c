@@ -48,6 +48,7 @@
 struct pn544_dev	{
 	wait_queue_head_t	read_wq;
 	struct mutex		read_mutex;
+	struct mutex		ioctl_mutex;
 	struct i2c_client	*client;
 	struct miscdevice	pn544_device;
     struct device       *pn544_control_device;
@@ -245,6 +246,24 @@ static int pn544_dev_ioctl(struct pn544_dev *pn544_dev, unsigned int cmd, unsign
 	return 0;
 }
 
+static long pn544_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct pn544_dev *pn544_dev;
+	int ret = 0;
+
+    pn544_dev = file->private_data;
+
+	mutex_lock(&pn544_dev->ioctl_mutex);
+
+	ret = pn544_dev_ioctl(pn544_dev, cmd, arg);
+
+	if (ret != 0) {
+		pr_err ("pn544_ioctl return error\n");
+	}
+	mutex_unlock(&pn544_dev->ioctl_mutex);
+
+	return ret;
+}
 
 static const struct file_operations pn544_dev_fops = {
 	.owner	= THIS_MODULE,
@@ -252,7 +271,7 @@ static const struct file_operations pn544_dev_fops = {
 	.read	= pn544_dev_read,
 	.write	= pn544_dev_write,
 	.open	= pn544_dev_open,
-	/* .ioctl = pn544_dev_unlocked_ioctl, */
+	.unlocked_ioctl = pn544_ioctl,
 };
 
 static struct gpiomux_setting pn544_ven_reset_suspend_config = {
@@ -419,6 +438,7 @@ static int pn544_probe(struct i2c_client *client,
 	/* init mutex and queues */
 	init_waitqueue_head(&pn544_dev->read_wq);
 	mutex_init(&pn544_dev->read_mutex);
+	mutex_init(&pn544_dev->ioctl_mutex);
 	spin_lock_init(&pn544_dev->irq_enabled_lock);
 
 	pn544_dev->pn544_device.minor = MISC_DYNAMIC_MINOR;
@@ -469,6 +489,7 @@ err_device_create_file_failed:
 	misc_deregister(&pn544_dev->pn544_device);
 err_misc_register:
 	mutex_destroy(&pn544_dev->read_mutex);
+	mutex_destroy(&pn544_dev->ioctl_mutex);
 	kfree(pn544_dev);
 err_exit:
 	gpio_free(platform_data->firmware_gpio);
@@ -490,6 +511,7 @@ static int pn544_remove(struct i2c_client *client)
     device_remove_file (pn544_dev->pn544_control_device, &dev_attr_pn544_control_dev);
 	misc_deregister(&pn544_dev->pn544_device);
 	mutex_destroy(&pn544_dev->read_mutex);
+	mutex_destroy(&pn544_dev->ioctl_mutex);
 	gpio_free(pn544_dev->irq_gpio);
 	gpio_free(pn544_dev->ven_gpio);
 	gpio_free(pn544_dev->firmware_gpio);
