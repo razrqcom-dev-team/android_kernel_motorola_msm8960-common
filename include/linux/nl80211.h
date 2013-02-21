@@ -1268,6 +1268,44 @@ enum nl80211_commands {
  * @NL80211_ATTR_VHT_CAPABILITY: VHT Capability information element (from
  *	association request when used with NL80211_CMD_NEW_STATION)
  *
+ * @NL80211_ATTR_SCAN_FLAGS: scan request control flags (u32)
+ *
+ * @NL80211_ATTR_P2P_CTWINDOW: P2P GO Client Traffic Window (u8), used with
+ *	the START_AP and SET_BSS commands
+ * @NL80211_ATTR_P2P_OPPPS: P2P GO opportunistic PS (u8), used with the
+ *	START_AP and SET_BSS commands. This can have the values 0 or 1;
+ *	if not given in START_AP 0 is assumed, if not given in SET_BSS
+ *	no change is made.
+ *
+ * @NL80211_ATTR_LOCAL_MESH_POWER_MODE: local mesh STA link-specific power mode
+ *	defined in &enum nl80211_mesh_power_mode.
+ *
+ * @NL80211_ATTR_ACL_POLICY: ACL policy, see &enum nl80211_acl_policy,
+ *	carried in a u32 attribute
+ *
+ * @NL80211_ATTR_MAC_ADDRS: Array of nested MAC addresses, used for
+ *	MAC ACL.
+ *
+ * @NL80211_ATTR_MAC_ACL_MAX: u32 attribute to advertise the maximum
+ *	number of MAC addresses that a device can support for MAC
+ *	ACL.
+ *
+ * @NL80211_ATTR_RADAR_EVENT: Type of radar event for notification to userspace,
+ *	contains a value of enum nl80211_radar_event (u32).
+ *
+ * @NL80211_ATTR_EXT_CAPA: 802.11 extended capabilities that the kernel driver
+ *	has and handles. The format is the same as the IE contents. See
+ *	802.11-2012 8.4.2.29 for more information.
+ * @NL80211_ATTR_EXT_CAPA_MASK: Extended capabilities that the kernel driver
+ *	has set in the %NL80211_ATTR_EXT_CAPA value, for multibit fields.
+ *
+ * @NL80211_ATTR_STA_CAPABILITY: Station capabilities (u16) are advertised to
+ *	the driver, e.g., to enable TDLS power save (PU-APSD).
+ *
+ * @NL80211_ATTR_STA_EXT_CAPABILITY: Station extended capabilities are
+ *	advertised to the driver, e.g., to enable TDLS off channel operations
+ *	and PU-APSD.
+ *
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
  */
