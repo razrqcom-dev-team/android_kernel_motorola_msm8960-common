@@ -2555,21 +2555,7 @@ static void a3xx_cp_callback(struct adreno_device *adreno_dev, int irq)
 {
 	struct adreno_ringbuffer *rb = &adreno_dev->ringbuffer;
 
-	if (irq == A3XX_INT_CP_RB_INT) {
-		unsigned int context_id;
-		kgsl_sharedmem_readl(&adreno_dev->dev.memstore,
-				&context_id,
-				KGSL_MEMSTORE_OFFSET(KGSL_MEMSTORE_GLOBAL,
-					current_context));
-		if (context_id < KGSL_MEMSTORE_MAX) {
-			kgsl_sharedmem_writel(&rb->device->memstore,
-					KGSL_MEMSTORE_OFFSET(context_id,
-						ts_cmp_enable), 0);
-			wmb();
-		}
-		KGSL_CMD_WARN(rb->device, "ringbuffer rb interrupt\n");
-	}
-
+	/* Wake up everybody waiting for the interrupt */
 	wake_up_interruptible_all(&rb->device->wait_queue);
 
 	/* Schedule work to free mem and issue ibs */
