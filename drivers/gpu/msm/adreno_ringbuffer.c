@@ -997,9 +997,6 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 					0,
 					&link[0], (cmds - link), *timestamp);
 
-	KGSL_CMD_INFO(device, "ctxt %d g %08x numibs %d ts %d\n",
-		context->id, (unsigned int)ibdesc, numibs, *timestamp);
-
 	kfree(link);
 
 #ifdef CONFIG_MSM_KGSL_CFF_DUMP
