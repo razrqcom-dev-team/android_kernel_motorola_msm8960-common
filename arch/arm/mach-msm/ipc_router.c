@@ -2247,7 +2247,11 @@ int msm_ipc_router_lookup_server_name(struct msm_ipc_port_name *srv_name,
 	mutex_lock(&server_list_lock);
 	if (!lookup_mask)
 		lookup_mask = 0xFFFFFFFF;
+#ifdef CONFIG_MACH_MSM8960_MMI
+	for (key = 0; key < SRV_HASH_SIZE; key++)
+#else
 	key = (srv_name->service & (SRV_HASH_SIZE - 1));
+#endif
 	list_for_each_entry(server, &server_list[key], list) {
 		if ((server->name.service != srv_name->service) ||
 		    ((server->name.instance & lookup_mask) !=
