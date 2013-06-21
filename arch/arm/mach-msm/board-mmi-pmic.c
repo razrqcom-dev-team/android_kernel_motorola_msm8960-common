@@ -668,7 +668,7 @@ static struct pm8921_bms_platform_data pm8921_bms_pdata __devinitdata = {
 	.enable_fcc_learning = 1,
 	.min_fcc_learning_soc = 20,
 	.min_fcc_ocv_pc = 30,
-	.max_fcc_learning_samples = 5,
+	.min_fcc_learning_samples = 5,
 #ifdef CONFIG_PM8921_EXTENDED_INFO
 	.get_batt_info          = read_mmi_battery_bms,
 #endif
