@@ -216,7 +216,7 @@
  * Set the request timeout to 10secs to allow
  * bad cards/controller to respond.
  */
-#define MSM_MMC_REQ_TIMEOUT	10000 /* msecs */
+#define MSM_MMC_REQ_TIMEOUT	8000 /* msecs */
 #define MSM_MMC_DISABLE_TIMEOUT        200 /* msecs */
 
 /*

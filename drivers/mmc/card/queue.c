@@ -22,8 +22,6 @@
 
 #define MMC_QUEUE_BOUNCESZ	65536
 
-#define MMC_QUEUE_SUSPENDED	(1 << 0)
-
 /*
  * Prepare a MMC request. This just filters out odd stuff.
  */

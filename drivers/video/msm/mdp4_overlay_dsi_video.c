@@ -758,16 +758,3 @@ void mdp4_dsi_video_overlay(struct msm_fb_data_type *mfd)
 	mutex_unlock(&mfd->dma->ov_mutex);
 }
 
-void mdp4_dsi_panel_off(struct msm_fb_data_type *mfd)
-{
-#ifdef CONFIG_FB_MSM_MIPI_DSI_MOT
-	struct msm_fb_panel_data *pdata =
-		(struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
-
-	if (pdata->panel_off) {
-		mutex_lock(&mfd->dma->ov_mutex);
-		pdata->panel_off(mfd->pdev);
-		mutex_unlock(&mfd->dma->ov_mutex);
-	}
-#endif
-}

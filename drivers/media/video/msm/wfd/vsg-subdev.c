@@ -400,7 +400,6 @@ static long vsg_queue_buffer(struct v4l2_subdev *sd, void *arg)
 				mdp_buf_info_equals(
 					&context->last_buffer->mdp_buf_info,
 					&temp->mdp_buf_info);
-
 			list_del(&temp->node);
 
 			if (!is_last_buffer &&

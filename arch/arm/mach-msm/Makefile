@@ -344,3 +344,4 @@ obj-$(CONFIG_MSM_CACHE_ERP) += cache_erp.o
 obj-$(CONFIG_MSM_CACHE_DUMP) += msm_cache_dump.o
 obj-$(CONFIG_PM_DEBUG) += pm_debug.o
 obj-$(CONFIG_HOB_SHARED_RAM_MMI) += mmi_hob_ram_mmap.o
+obj-$(CONFIG_MSM_CPU_PWRCTL) += msm_cpu_pwrctl.o

@@ -752,9 +752,9 @@ void mdp4_dsi_cmd_overlay(struct msm_fb_data_type *mfd)
 	mutex_unlock(&mfd->dma->ov_mutex);
 }
 
+#ifdef CONFIG_FB_MSM_MIPI_DSI_MOT
 void mdp4_dsi_panel_on(struct msm_fb_data_type *mfd)
 {
-#ifdef CONFIG_FB_MSM_MIPI_DSI_MOT
 	struct msm_fb_panel_data *pdata =
 		(struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 
@@ -764,5 +764,16 @@ void mdp4_dsi_panel_on(struct msm_fb_data_type *mfd)
 
 		dsi_panel_on = true;
 	}
-#endif
 }
+void mdp4_dsi_panel_off(struct msm_fb_data_type *mfd)
+{
+	struct msm_fb_panel_data *pdata =
+		(struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
+
+	if (dsi_panel_on == true) {
+		if (pdata->panel_off)
+			pdata->panel_off(mfd->pdev);
+		dsi_panel_on = false;
+	}
+}
+#endif

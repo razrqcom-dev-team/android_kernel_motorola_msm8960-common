@@ -1,6 +1,8 @@
 #ifndef MMC_QUEUE_H
 #define MMC_QUEUE_H
 
+#define MMC_QUEUE_SUSPENDED	(1 << 0)
+
 struct request;
 struct task_struct;
 

@@ -98,6 +98,24 @@ static unsigned long timer_rate;
 static unsigned long above_hispeed_delay_val;
 
 /*
+ * Minimum load required to raise speed
+ */
+#define DEFAULT_MIN_RAISE_LOAD 45
+static unsigned long min_raise_load;
+
+/*
+ * Minimum load required to maintain/justify current speed
+ */
+#define DEFAULT_MAINTENANCE_LOAD 30
+static unsigned long maintenance_load;
+
+/*
+ * Treat IO as busy or not
+ */
+#define DEFAULT_IO_IS_BUSY 0
+static unsigned long io_is_busy;
+
+/*
  * Boost pulse to hispeed on touchscreen input.
  */
 
@@ -129,9 +147,24 @@ struct cpufreq_governor cpufreq_gov_interactive = {
 	.owner = THIS_MODULE,
 };
 
+static inline u64 get_gov_idle_time(int cpu, u64 *last)
+{
+	u64 io = get_cpu_iowait_time_us(cpu, last);
+	u64 idle = get_cpu_idle_time_us(cpu, last);
+	if (io_is_busy && io != (-1ULL)) {
+		idle -= io;
+		/* In a corner case, if iowait time gets incremented between
+		 * reading iowait and idle times, more idle is reported than
+		 * should be. Subsequent call could return slightly less idle.
+		 * Take care to handle (new idle - old idle) < 0
+		 */
+	}
+	return idle;
+}
+
 static void cpufreq_interactive_timer(unsigned long data)
 {
-	unsigned int delta_idle;
+	int delta_idle;
 	unsigned int delta_time;
 	int cpu_load;
 	int load_since_change;
@@ -160,7 +193,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	 */
 	time_in_idle = pcpu->time_in_idle;
 	idle_exit_time = pcpu->idle_exit_time;
-	now_idle = get_cpu_idle_time_us(data, &pcpu->timer_run_time);
+	now_idle = get_gov_idle_time(data, &pcpu->timer_run_time);
 	smp_wmb();
 
 	/* If we raced with cancelling a timer, skip. */
@@ -223,6 +256,19 @@ static void cpufreq_interactive_timer(unsigned long data)
 		}
 	} else {
 		new_freq = pcpu->policy->max * cpu_load / 100;
+
+		if (cpu_load < maintenance_load) {
+			/* Drop CPU speed if load less than threshold.  Only
+			 * lower it so far that it won't get raised next time.
+			 */
+			unsigned int max_freq =
+				pcpu->target_freq * cpu_load/min_raise_load;
+			new_freq = new_freq > max_freq ? max_freq : new_freq;
+		} else if (cpu_load < min_raise_load) {
+			/* Don't raise CPU Freq if load is below threhold */
+			if (pcpu->target_freq < new_freq)
+				new_freq = pcpu->target_freq;
+		}
 	}
 
 	if (new_freq <= hispeed_freq)
@@ -304,7 +350,7 @@ rearm:
 			pcpu->timer_idlecancel = 1;
 		}
 
-		pcpu->time_in_idle = get_cpu_idle_time_us(
+		pcpu->time_in_idle = get_gov_idle_time(
 			data, &pcpu->idle_exit_time);
 		mod_timer(&pcpu->cpu_timer,
 			  jiffies + usecs_to_jiffies(timer_rate));
@@ -358,7 +404,7 @@ static void cpufreq_interactive_idle_start(void)
 		 * the CPUFreq driver.
 		 */
 		if (!pending) {
-			pcpu->time_in_idle = get_cpu_idle_time_us(
+			pcpu->time_in_idle = get_gov_idle_time(
 				smp_processor_id(), &pcpu->idle_exit_time);
 			pcpu->timer_idlecancel = 0;
 			mod_timer(&pcpu->cpu_timer,
@@ -408,7 +454,7 @@ static void cpufreq_interactive_idle_end(void)
 			if (!pcpu->idle_exit_time)
 				/* Start computing the load anew. */
 				pcpu->time_in_idle =
-				get_cpu_idle_time_us(smp_processor_id(),
+				get_gov_idle_time(smp_processor_id(),
 					&pcpu->idle_exit_time);
 			mod_timer(&pcpu->cpu_timer, time_to_run);
 		}
@@ -429,7 +475,7 @@ static void cpufreq_interactive_idle_end(void)
 	    pcpu->timer_run_time >= pcpu->idle_exit_time &&
 	    pcpu->governor_enabled) {
 		pcpu->time_in_idle =
-			get_cpu_idle_time_us(smp_processor_id(),
+			get_gov_idle_time(smp_processor_id(),
 					     &pcpu->idle_exit_time);
 		pcpu->timer_idlecancel = 0;
 		mod_timer(&pcpu->cpu_timer,
@@ -557,7 +603,7 @@ static void cpufreq_interactive_boost(void)
 			pcpu->target_freq = hispeed_freq;
 			cpumask_set_cpu(i, &up_cpumask);
 			pcpu->target_set_time_in_idle =
-				get_cpu_idle_time_us(i, &pcpu->target_set_time);
+				get_gov_idle_time(i, &pcpu->target_set_time);
 			pcpu->hispeed_validate_time = pcpu->target_set_time;
 			anyboost = 1;
 		}
@@ -889,6 +935,75 @@ static struct global_attr idle_cancel_timer_attr =
 	__ATTR(idle_cancel_timer, 0644,
 		show_idle_cancel_timer, store_idle_cancel_timer);
 
+static ssize_t show_maintenance_load(struct kobject *kobj,
+				     struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%lu\n", maintenance_load);
+}
+
+static ssize_t store_maintenance_load(struct kobject *kobj,
+			struct attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	maintenance_load = val;
+	return count;
+}
+
+static struct global_attr maintenance_load_attr =
+	__ATTR(maintenance_load, 0644,
+		show_maintenance_load, store_maintenance_load);
+
+static ssize_t show_min_raise_load(struct kobject *kobj,
+				     struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%lu\n", min_raise_load);
+}
+
+static ssize_t store_min_raise_load(struct kobject *kobj,
+			struct attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	min_raise_load = val;
+	return count;
+}
+
+static struct global_attr min_raise_load_attr =
+	__ATTR(min_raise_load, 0644,
+		show_min_raise_load, store_min_raise_load);
+
+static ssize_t show_io_is_busy(struct kobject *kobj,
+				     struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%lu\n", io_is_busy);
+}
+
+static ssize_t store_io_is_busy(struct kobject *kobj,
+			struct attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	io_is_busy = val;
+	return count;
+}
+
+static struct global_attr io_is_busy_attr =
+	__ATTR(io_is_busy, 0644,
+		show_io_is_busy, store_io_is_busy);
+
 static struct attribute *interactive_attributes[] = {
 	&hispeed_freq_attr.attr,
 	&go_hispeed_load_attr.attr,
@@ -899,6 +1014,9 @@ static struct attribute *interactive_attributes[] = {
 	&boost.attr,
 	&boostpulse.attr,
 	&idle_cancel_timer_attr.attr,
+	&maintenance_load_attr.attr,
+	&min_raise_load_attr.attr,
+	&io_is_busy_attr.attr,
 	NULL,
 };
 
@@ -929,7 +1047,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			pcpu->target_freq = policy->cur;
 			pcpu->freq_table = freq_table;
 			pcpu->target_set_time_in_idle =
-				get_cpu_idle_time_us(j,
+				get_gov_idle_time(j,
 					     &pcpu->target_set_time);
 			pcpu->floor_freq = pcpu->target_freq;
 			pcpu->floor_validate_time =
@@ -937,6 +1055,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			pcpu->hispeed_validate_time =
 				pcpu->target_set_time;
 			pcpu->governor_enabled = 1;
+			pcpu->idle_exit_time = pcpu->target_set_time;
+			mod_timer(&pcpu->cpu_timer,
+				jiffies + usecs_to_jiffies(timer_rate));
 			smp_wmb();
 		}
 
@@ -1032,6 +1153,9 @@ static int __init cpufreq_interactive_init(void)
 	above_hispeed_delay_val = DEFAULT_ABOVE_HISPEED_DELAY;
 	timer_rate = DEFAULT_TIMER_RATE;
 	idle_cancel_timer = DEFAULT_IDLE_CANCEL_TIMER;
+	min_raise_load = DEFAULT_MIN_RAISE_LOAD;
+	maintenance_load = DEFAULT_MAINTENANCE_LOAD;
+	io_is_busy = DEFAULT_IO_IS_BUSY;
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {

@@ -98,6 +98,13 @@ static int msm_ctrl_cmd_done(void __user *arg)
 			sizeof(struct msm_ctrl_cmd)))
 		return -EINVAL;
 
+	if (command->evt_id != g_server_dev.server_evt_id) {
+		pr_err("%s Invalid event id from userspace cmd id %d %d\n",
+			   __func__, command->evt_id,
+			   g_server_dev.server_evt_id);
+		return -EINVAL;
+	}
+
 	qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_KERNEL);
 	atomic_set(&qcmd->on_heap, 1);
 	uptr = command->value;
@@ -153,6 +160,7 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 	*((uint32_t *)v4l2_evt.u.data) = (uint32_t)isp_event;
 	isp_event->resptype = MSM_CAM_RESP_V4L2;
 	isp_event->isp_data.ctrl = *out;
+	isp_event->isp_data.ctrl.evt_id = g_server_dev.server_evt_id;
 	if (out->length > 0 && out->value != NULL) {
 		ctrlcmd_data = kzalloc(out->length, GFP_KERNEL);
 		if (!ctrlcmd_data) {
@@ -182,7 +190,17 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 		if (rc < 0) {
 			if (g_server_dev.server_evt_id == 0)
 				g_server_dev.server_evt_id++;
-			pr_err("%s: wait_event error %d\n", __func__, rc);
+			pr_err("%s: wait_event error %d for command%d\n",
+				   __func__, rc, out->type);
+			if (out->type == MSM_V4L2_SET_CTRL_CMD
+				&& out->value != NULL) {
+				pr_err("Set native ctrl type is %d\n",
+				((struct msm_ctrl_cmd *)out->value)->type);
+			} else if (out->type == MSM_V4L2_SET_CTRL
+				&& out->value != NULL) {
+				pr_err("Set ctrl type is 0x%x\n",
+				((struct v4l2_control *)out->value)->id);
+			}
 			return rc;
 		}
 	}
@@ -462,7 +480,10 @@ static int msm_server_proc_ctrl_cmd(struct msm_cam_v4l2_device *pcam,
 	ctrlcmd.type = MSM_V4L2_SET_CTRL_CMD;
 	ctrlcmd.length = cmd_len + value_len;
 	ctrlcmd.value = (void *)ctrl_data;
-	ctrlcmd.timeout_ms = 1000;
+	if (tmp_cmd->timeout_ms > 0)
+		ctrlcmd.timeout_ms = tmp_cmd->timeout_ms;
+	else
+		ctrlcmd.timeout_ms = 1000;
 	ctrlcmd.vnode_id = pcam->vnode_id;
 	ctrlcmd.config_ident = g_server_dev.config_info.config_dev_id[0];
 	/* send command to config thread in usersspace, and get return value */
@@ -2292,40 +2313,6 @@ static long msm_ioctl_config(struct file *fp, unsigned int cmd,
 	return rc;
 }
 
-static int msm_mmap_config(struct file *fp, struct vm_area_struct *vma)
-{
-	struct msm_cam_config_dev *config_cam = fp->private_data;
-	int rc = 0;
-	int phyaddr;
-	int retval;
-	unsigned long size;
-
-	D("%s: phy_addr=0x%x", __func__, config_cam->mem_map.cookie);
-	phyaddr = (int)config_cam->mem_map.cookie;
-	if (!phyaddr) {
-		pr_err("%s: no physical memory to map", __func__);
-		return -EFAULT;
-	}
-	memset(&config_cam->mem_map, 0,
-		sizeof(struct msm_mem_map_info));
-	size = vma->vm_end - vma->vm_start;
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-	retval = remap_pfn_range(vma, vma->vm_start,
-					phyaddr >> PAGE_SHIFT,
-					size, vma->vm_page_prot);
-	if (retval) {
-		pr_err("%s: remap failed, rc = %d",
-					__func__, retval);
-		rc = -ENOMEM;
-		goto end;
-	}
-	D("%s: phy_addr=0x%x: %08lx-%08lx, pgoff %08lx\n",
-			__func__, (uint32_t)phyaddr,
-			vma->vm_start, vma->vm_end, vma->vm_pgoff);
-end:
-	return rc;
-}
-
 static int msm_open_config(struct inode *inode, struct file *fp)
 {
 	int rc;
@@ -2394,7 +2381,6 @@ static const struct file_operations msm_fops_config = {
 	.open  = msm_open_config,
 	.poll  = msm_poll_config,
 	.unlocked_ioctl = msm_ioctl_config,
-	.mmap	= msm_mmap_config,
 	.release = msm_close_config,
 };
 
@@ -2517,6 +2503,7 @@ static int msm_setup_server_dev(int node, char *device_name)
 	g_server_dev.pcam_active = NULL;
 	g_server_dev.camera_info.num_cameras = 0;
 	atomic_set(&g_server_dev.number_pcam_active, 0);
+	g_server_dev.server_evt_id = 0;
 
 	/*initialize fake video device and event queue*/
 

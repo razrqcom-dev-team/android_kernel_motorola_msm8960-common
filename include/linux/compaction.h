@@ -12,6 +12,7 @@
 #define COMPACT_COMPLETE	3
 
 #ifdef CONFIG_COMPACTION
+extern int mem_compaction_init(void);
 extern int sysctl_compact_memory;
 extern int sysctl_compaction_handler(struct ctl_table *table, int write,
 			void __user *buffer, size_t *length, loff_t *ppos);
@@ -28,7 +29,7 @@ extern unsigned long compact_zone_order(struct zone *zone, int order,
 					gfp_t gfp_mask, bool sync);
 
 /* Do not skip compaction more than 64 times */
-#define COMPACT_MAX_DEFER_SHIFT 6
+#define COMPACT_MAX_DEFER_SHIFT 0 /* don't need to defer */
 
 /*
  * Compaction is deferred when compaction fails to result in a page
@@ -82,6 +83,11 @@ static inline void defer_compaction(struct zone *zone)
 static inline bool compaction_deferred(struct zone *zone)
 {
 	return 1;
+}
+
+static inline int mem_compaction_init(void)
+{
+	return 0;
 }
 
 #endif /* CONFIG_COMPACTION */

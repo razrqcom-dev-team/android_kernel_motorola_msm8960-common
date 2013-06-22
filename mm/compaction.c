@@ -14,6 +14,7 @@
 #include <linux/backing-dev.h>
 #include <linux/sysctl.h>
 #include <linux/sysfs.h>
+#include <linux/earlysuspend.h>
 #include "internal.h"
 
 #define CREATE_TRACE_POINTS
@@ -676,46 +677,59 @@ unsigned long try_to_compact_pages(struct zonelist *zonelist,
 }
 
 
+/* Compact a specific zone within a node
+ * The input parameter nid and zoneid should be
+ * verified by caller.
+ */
+static int compact_node_zone(int nid, int zoneid)
+{
+	pg_data_t *pgdat;
+	struct zone *zone;
+	struct compact_control cc = {
+		.nr_freepages = 0,
+		.nr_migratepages = 0,
+		.sync = false,
+		.order = -1,
+	};
+
+	pgdat = NODE_DATA(nid);
+
+	zone = &pgdat->node_zones[zoneid];
+	if (!populated_zone(zone))
+		return 0;
+
+	cc.zone = zone;
+	INIT_LIST_HEAD(&cc.freepages);
+	INIT_LIST_HEAD(&cc.migratepages);
+
+	compact_zone(zone, &cc);
+
+	VM_BUG_ON(!list_empty(&cc.freepages));
+	VM_BUG_ON(!list_empty(&cc.migratepages));
+
+	return 0;
+}
 /* Compact all zones within a node */
 static int compact_node(int nid)
 {
 	int zoneid;
-	pg_data_t *pgdat;
-	struct zone *zone;
 
 	if (nid < 0 || nid >= nr_node_ids || !node_online(nid))
 		return -EINVAL;
-	pgdat = NODE_DATA(nid);
-
 	/* Flush pending updates to the LRU lists */
 	lru_add_drain_all();
 
 	for (zoneid = 0; zoneid < MAX_NR_ZONES; zoneid++) {
-		struct compact_control cc = {
-			.nr_freepages = 0,
-			.nr_migratepages = 0,
-			.order = -1,
-		};
 
-		zone = &pgdat->node_zones[zoneid];
-		if (!populated_zone(zone))
-			continue;
+		compact_node_zone(nid, zoneid);
 
-		cc.zone = zone;
-		INIT_LIST_HEAD(&cc.freepages);
-		INIT_LIST_HEAD(&cc.migratepages);
-
-		compact_zone(zone, &cc);
-
-		VM_BUG_ON(!list_empty(&cc.freepages));
-		VM_BUG_ON(!list_empty(&cc.migratepages));
 	}
 
 	return 0;
 }
 
 /* Compact all nodes in the system */
-int compact_nodes(void)
+static int compact_nodes(void)
 {
 	int nid;
 
@@ -724,7 +738,33 @@ int compact_nodes(void)
 
 	return COMPACT_COMPLETE;
 }
-EXPORT_SYMBOL(compact_nodes);
+/* Compact all nodes' normal zone only*/
+static void try_to_compact_normal_zone(void)
+{
+	int nid;
+
+	for_each_online_node(nid)
+		compact_node_zone(nid, ZONE_NORMAL);
+
+	printk(KERN_INFO "Normal Zone Compacted.\n");
+}
+
+static void early_suspend_compact_normal_zone(struct early_suspend *s)
+{
+	try_to_compact_normal_zone();
+}
+
+static struct early_suspend early_suspend_compaction_desc = {
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+	.suspend = early_suspend_compact_normal_zone,
+	.resume = NULL,
+};
+
+int mem_compaction_init(void)
+{
+	register_early_suspend(&early_suspend_compaction_desc);
+	return 0;
+}
 
 /* The written value is actually unused, all memory is compacted */
 int sysctl_compact_memory;

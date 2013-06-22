@@ -44,7 +44,6 @@
 #define DRV_NAME	"msm_dsps"
 #define DRV_VERSION	"3.03"
 
-
 #define PPSS_TIMER0_32KHZ_REG	0x1004
 #define PPSS_TIMER0_20MHZ_REG	0x0804
 

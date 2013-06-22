@@ -266,6 +266,10 @@ struct mmc_host {
 	struct wake_lock	detect_wake_lock;
 	int                     detect_change;  /* card detect flag */
 
+#define MMC_MAX_FAILURES	3
+	unsigned int		failures;	/* number of device failures */
+	struct wake_lock	recovery_wake_lock;
+
 	const struct mmc_bus_ops *bus_ops;	/* current bus driver */
 	unsigned int		bus_refs;	/* reference counter */
 
@@ -354,6 +358,7 @@ extern int mmc_resume_bus(struct mmc_host *host);
 
 extern int mmc_suspend_host(struct mmc_host *);
 extern int mmc_resume_host(struct mmc_host *);
+extern int mmc_reset_host(struct mmc_host *);
 
 extern int mmc_power_save_host(struct mmc_host *host);
 extern int mmc_power_restore_host(struct mmc_host *host);

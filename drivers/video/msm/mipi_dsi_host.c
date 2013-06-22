@@ -1133,25 +1133,29 @@ int mipi_dsi_cmds_tx(struct msm_fb_data_type *mfd,
 	if (video_mode) {
 		ctrl = dsi_ctrl | 0x04; /* CMD_MODE_EN */
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0000, ctrl);
-	} else { /* cmd mode */
-		/*
-		 * during boot up, cmd mode is configured
-		 * even it is video mode panel.
-		 */
-		/* make sure mdp dma is not txing pixel data */
-		if (mfd->panel_info.type == MIPI_CMD_PANEL) {
+	}
+	/* cmd mode */
+	/*
+	 * during boot up, cmd mode is configured
+	 * even it is video mode panel.
+	 */
+	/* make sure mdp dma is not txing pixel data */
+	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
 #ifndef CONFIG_FB_MSM_MDP303
-			mdp4_dsi_cmd_dma_busy_wait(mfd);
+		mdp4_dsi_cmd_dma_busy_wait(mfd);
 #else
-			mdp3_dsi_cmd_dma_busy_wait(mfd);
+		mdp3_dsi_cmd_dma_busy_wait(mfd);
 #endif
-		} else
-			/*
-			 * wait for vsync before we start to transfer data
-			 * in video mode
-			 */
-			mdp4_overlay_dsi_video_wait4event(mfd,
-							INTR_PRIMARY_VSYNC);
+		mipi_dsi_mdp_busy_wait(mfd);
+		mdp4_dsi_blt_dmap_busy_wait(mfd);
+
+	} else {
+		/*
+		 * wait for vsync before we start to transfer data
+		 * in video mode
+		 */
+		mdp4_overlay_dsi_video_wait4event(mfd, INTR_PRIMARY_VSYNC);
+		udelay(100);
 	}
 
 	spin_lock_irqsave(&dsi_mdp_lock, flag);
@@ -1165,8 +1169,17 @@ int mipi_dsi_cmds_tx(struct msm_fb_data_type *mfd,
 		mipi_dsi_buf_init(tp);
 		mipi_dsi_cmd_dma_add(tp, cm);
 		mipi_dsi_cmd_dma_tx(tp);
-		if (cm->wait)
-			mdelay(cm->wait);
+		if (cm->wait) {
+			/*
+			 * If delay is short, use mdelay to avoid latency which
+			 * is introduced by scheduling out/in. If it is logger
+			 * than 50ms, use msleep to yield CPU to other threads.
+			 */
+			if (cm->wait > 50)
+				msleep(cm->wait);
+			else
+				mdelay(cm->wait);
+		}
 		cm++;
 	}
 
@@ -1224,25 +1237,29 @@ int mipi_dsi_cmds_rx(struct msm_fb_data_type *mfd,
 	if (video_mode) {
 		ctrl = dsi_ctrl | 0x04; /* CMD_MODE_EN */
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0000, ctrl);
-	} else { /* cmd mode */
-		/*
-		 * during boot up, cmd mode is configured
-		 * even it is video mode panel.
-		 */
-		/* make sure mdp dma is not txing pixel data */
-		if (mfd->panel_info.type == MIPI_CMD_PANEL) {
+	}
+	/* cmd mode */
+	/*
+	 * during boot up, cmd mode is configured
+	 * even it is video mode panel.
+	 */
+	/* make sure mdp dma is not txing pixel data */
+	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
 #ifndef CONFIG_FB_MSM_MDP303
-			mdp4_dsi_cmd_dma_busy_wait(mfd);
+		mdp4_dsi_cmd_dma_busy_wait(mfd);
 #else
-			mdp3_dsi_cmd_dma_busy_wait(mfd);
+		mdp3_dsi_cmd_dma_busy_wait(mfd);
 #endif
-		} else
-			/*
-			 * wait for vsync before we start to transfer data
-			 * in video mode
-			 */
-			mdp4_overlay_dsi_video_wait4event(mfd,
-							INTR_PRIMARY_VSYNC);
+		mipi_dsi_mdp_busy_wait(mfd);
+		mdp4_dsi_blt_dmap_busy_wait(mfd);
+
+	} else {
+	/*
+	 * wait for vsync before we start to transfer data
+	 * in video mode
+	 */
+		mdp4_overlay_dsi_video_wait4event(mfd, INTR_PRIMARY_VSYNC);
+		udelay(100);
 	}
 
 	if (rlen != cur_pkt_size) {
@@ -1612,10 +1629,6 @@ int mipi_reg_write(struct msm_fb_data_type *mfd, __u16 size, __u8 *buf,
 
 	mutex_lock(&mfd->dma->ov_mutex);
 
-	mdp4_dsi_cmd_dma_busy_wait(mfd);
-	mipi_dsi_mdp_busy_wait(mfd);
-	mdp4_dsi_blt_dmap_busy_wait(mfd);
-
 	old_tx_mode = mipi_get_tx_power_mode();
 	new_tx_mode = !use_hs_mode;
 
@@ -1669,10 +1682,6 @@ int mipi_reg_read(struct msm_fb_data_type *mfd, __u16 address,
 	}
 
 	mutex_lock(&mfd->dma->ov_mutex);
-
-	mdp4_dsi_cmd_dma_busy_wait(mfd);
-	mipi_dsi_mdp_busy_wait(mfd);
-	mdp4_dsi_blt_dmap_busy_wait(mfd);
 
 	old_tx_mode = mipi_get_tx_power_mode();
 	new_tx_mode = !use_hs_mode;

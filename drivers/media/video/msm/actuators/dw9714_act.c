@@ -162,25 +162,25 @@ static struct damping_params_t dw9714_inf_reg1_damping[] = {
 	/* Scene 1 => Damping params */
 	{
 		.damping_step = 0xFF,
-		.damping_delay = 450,
+		.damping_delay = 4500,
 		.hw_params = &dw9714_hw_params[4],
 	},
 	/* Scene 2 => Damping params */
 	{
 		.damping_step = 0xFF,
-		.damping_delay = 450,
+		.damping_delay = 4500,
 		.hw_params = &dw9714_hw_params[4],
 	},
 	/* Scene 3 => Damping params */
 	{
 		.damping_step = 0xFF,
-		.damping_delay = 450,
+		.damping_delay = 4500,
 		.hw_params = &dw9714_hw_params[4],
 	},
 	/* Scene 4 => Damping params */
 	{
 		.damping_step = 0xFF,
-		.damping_delay = 450,
+		.damping_delay = 4500,
 		.hw_params = &dw9714_hw_params[4],
 	},
 };
@@ -190,25 +190,25 @@ static struct damping_params_t dw9714_inf_reg2_damping[] = {
 	/* Scene 1 => Damping params */
 	{
 		.damping_step = 0x1FF,
-		.damping_delay = 1000,
+		.damping_delay = 41000,
 		.hw_params = &dw9714_hw_params[1],
 	},
 	/* Scene 2 => Damping params */
 	{
 		.damping_step = 0x1FF,
-		.damping_delay = 24000,
+		.damping_delay = 44000,
 		.hw_params = &dw9714_hw_params[2],
 	},
 	/* Scene 3 => Damping params */
 	{
 		.damping_step = 0x1FF,
-		.damping_delay = 28000,
+		.damping_delay = 48000,
 		.hw_params = &dw9714_hw_params[4],
 	},
 	/* Scene 4 => Damping params */
 	{
 		.damping_step = 135,
-		.damping_delay = 20000,
+		.damping_delay = 43000,
 		.hw_params = &dw9714_hw_params[4],
 	},
 };

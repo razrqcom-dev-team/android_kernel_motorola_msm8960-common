@@ -156,6 +156,7 @@ struct sdio_func;
 struct sdio_func_tuple;
 
 #define SDIO_MAX_FUNCS		7
+#define MMC_MAX_CARD_INFIRMITY	8
 
 /*
  * MMC device
@@ -214,6 +215,8 @@ struct mmc_card {
 	struct sdio_func_tuple	*tuples;	/* unknown common tuples */
 
 	unsigned int		sd_bus_speed;	/* Bus Speed Mode set for the card */
+
+	unsigned int		infirmity;	/* measure of a card's health */
 
 	struct dentry		*debugfs_root;
 };
@@ -324,6 +327,9 @@ static inline void __maybe_unused remove_quirk(struct mmc_card *card, int data)
 #define mmc_sd_card_set_uhs(c) ((c)->state |= MMC_STATE_ULTRAHIGHSPEED)
 #define mmc_card_set_ext_capacity(c) ((c)->state |= MMC_CARD_SDXC)
 #define mmc_card_set_removed(c) ((c)->state |= MMC_CARD_REMOVED)
+
+#define mmc_card_recoverable(c)	((c) && (c)->host && \
+				 !((c)->host->caps & MMC_CAP_NONREMOVABLE))
 
 /*
  * Quirk add/remove for MMC products.

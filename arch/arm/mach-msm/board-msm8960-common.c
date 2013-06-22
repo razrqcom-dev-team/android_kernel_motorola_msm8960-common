@@ -2859,7 +2859,7 @@ struct msm_mmc_pin_data mmc_slot_pin_data[MAX_SDCC_CONTROLLER] = {
 };
 
 static unsigned int sdc1_sup_clk_rates[] = {
-	400000, 24000000, 48000000
+	400000, 24000000, 48000000, 96000000
 };
 
 static unsigned int sdc3_sup_clk_rates[] = {
@@ -2879,7 +2879,10 @@ static struct mmc_platform_data msm8960_sdc1_data = {
 	.pclk_src_dfab	= 1,
 	.nonremovable	= 1,
 	.vreg_data	= &mmc_slot_vreg_data[SDCC1],
-	.pin_data	= &mmc_slot_pin_data[SDCC1]
+	.pin_data	= &mmc_slot_pin_data[SDCC1],
+	.uhs_caps	= (MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
+			MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_DDR50 |
+			MMC_CAP_1_8V_DDR)
 };
 #endif
 
@@ -3104,6 +3107,13 @@ static struct msm_rpmrs_level msm_rpmrs_levels[] = {
 		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
 		true,
 		100, 650, 801, 200,
+	},
+
+	{
+		MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE,
+		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
+		true,
+		2000, 200, 576000, 2000,
 	},
 
 	{

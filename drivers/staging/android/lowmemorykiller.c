@@ -107,6 +107,65 @@ static int lmk_hotplug_callback(struct notifier_block *self,
 #endif
 
 
+/*
+ * The # of pages, that should be reduced for each zone, will be
+ * minfree * p. and  p = (zone_size)/total_size * 100%.
+ * Here is the algorithm of how to calculate it:
+ *
+ *     there is always such n that n/2^k < p < (n+1)/2^k
+ *     so  n = 2^k * p; and k is the precision, set it 16.
+ *
+ *     Then, minfree * p =  (minfree * n) >> k
+ */
+#define LOWMEM_ZONE_ADJ_PRECISION 16
+static int lowmem_zone_n[MAX_NR_ZONES];
+
+static void lowmem_zone_adj_init(void)
+{
+	unsigned long int total_pages;
+	unsigned long long int p;
+	struct zone *zone;
+
+	if (MAX_NR_ZONES == 1) /* if there is only one zone, just return */
+		return;
+
+	total_pages = 0;
+	for_each_zone(zone)
+		total_pages += zone->present_pages;
+
+	lowmem_print(2, "%s: total pages = %lu in %d zones\n", __func__,
+		total_pages, MAX_NR_ZONES);
+
+	for_each_zone(zone) {
+
+		p = (zone->present_pages << 10)/total_pages;
+		lowmem_zone_n[zone_idx(zone)] =
+			(int)((p << LOWMEM_ZONE_ADJ_PRECISION) >> 10);
+
+		lowmem_print(2, "%s: zone (%s, %d) present=%lu,"
+				"(0.%03lld, n=%d)\n",
+				__func__, zone->name,
+				zone_idx(zone), zone->present_pages,
+				p, lowmem_zone_n[zone_idx(zone)]);
+	}
+}
+static int lowmem_zone_adj(int min_size_indx, int high_zoneidx)
+{
+	int s, minfree, i;
+
+	if (high_zoneidx >= MAX_NR_ZONES - 1)
+		return 0;
+
+	minfree = lowmem_minfree[min_size_indx];
+
+	s = 0;
+	for (i = MAX_NR_ZONES - 1; i > high_zoneidx; i--)
+		s += (minfree * lowmem_zone_n[i]) >> LOWMEM_ZONE_ADJ_PRECISION;
+
+	lowmem_print(5, "%s: original min = %d, high_indx = %d, reduce = %d\n",
+			__func__, minfree, high_zoneidx, s);
+	return s;
+}
 
 static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 {
@@ -123,19 +182,9 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM);
 	struct zone *zone;
+	int high_zoneidx = gfp_zone(sc->gfp_mask);
+	int zone_adj;
 
-	if (offlining) {
-		/* Discount all free space in the section being offlined */
-		for_each_zone(zone) {
-			 if (zone_idx(zone) == ZONE_MOVABLE) {
-				other_free -= zone_page_state(zone,
-						NR_FREE_PAGES);
-				lowmem_print(4, "lowmem_shrink discounted "
-					"%lu pages in movable zone\n",
-					zone_page_state(zone, NR_FREE_PAGES));
-			}
-		}
-	}
 	/*
 	 * If we already have a death outstanding, then
 	 * bail out right away; indicating to vmscan
@@ -147,13 +196,30 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	    time_before_eq(jiffies, lowmem_deathpending_timeout))
 		return 0;
 
+	for_each_zone(zone) {
+		/*
+		 * Discount all free/file pages in "higher" zones, or
+		 * all free space in the section being offlined.
+		 *
+		 */
+		if ((zone_idx(zone) > high_zoneidx) ||
+		    (offlining && (zone_idx(zone) == ZONE_MOVABLE))) {
+			other_free -= zone_page_state(zone, NR_FREE_PAGES);
+			other_file -= zone_page_state(zone, NR_FILE_PAGES) -
+						zone_page_state(zone, NR_SHMEM);
+		}
+	}
+
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;
 	if (lowmem_minfree_size < array_size)
 		array_size = lowmem_minfree_size;
 	for (i = 0; i < array_size; i++) {
-		if (other_free < lowmem_minfree[i] &&
-		    other_file < lowmem_minfree[i]) {
+
+		zone_adj = lowmem_zone_adj(i, high_zoneidx);
+
+		if (other_free < (lowmem_minfree[i] - zone_adj)  &&
+		    other_file < (lowmem_minfree[i] - zone_adj)) {
 			min_adj = lowmem_adj[i];
 			break;
 		}
@@ -235,6 +301,7 @@ static int __init lowmem_init(void)
 #ifdef CONFIG_MEMORY_HOTPLUG
 	hotplug_memory_notifier(lmk_hotplug_callback, 0);
 #endif
+	lowmem_zone_adj_init();
 	return 0;
 }
 

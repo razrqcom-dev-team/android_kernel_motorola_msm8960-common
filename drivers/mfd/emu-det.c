@@ -183,7 +183,6 @@ EXPORT_SYMBOL_GPL(emu_det_vlcl_register_notify);
 	DEF(USB), \
 	DEF(FACTORY), \
 	DEF(CHARGER), \
-	DEF(WHISPER_PPD), \
 	DEF(WHISPER_SMART), \
 	DEF(CHARGER_INDUCTIVE), \
 	DEF(USB_ADAPTER), \
@@ -340,6 +339,7 @@ struct emu_det_data {
 	int driver_mode;
 	int reverse_mode_enable;
 	bool whisper_ioctl_context;
+	bool is_chg_plugged_in;
 };
 
 #define VBUS_ADC_READ_SETTLE_TIME 20	/* ms */
@@ -517,15 +517,13 @@ void set_mux_ctrl_mode_for_audio(int mode)
 
 	if (emud->whisper_auth == AUTH_IN_PROGRESS) {
 		if ((mode < MUXMODE_UNDEFINED) &&
-		    ((emud->state == CHARGER) ||
-		     (emud->state == WHISPER_PPD)))
+		    (emud->state == CHARGER))
 			emud->requested_muxmode = mode;
 		return;
 	}
 
 	if ((emud->whisper_auth == AUTH_PASSED) &&
-	    ((emud->state == CHARGER) ||
-	     (emud->state == WHISPER_PPD))) {
+	    (emud->state == CHARGER)) {
 		if ((!emu_audio) ||
 		    (mode != MUXMODE_AUDIO))
 			mode = MUXMODE_USB;
@@ -541,8 +539,7 @@ static void mux_ctrl_mode(int mode)
 	int check_validity = 0;
 
 	if ((emud->requested_muxmode != MUXMODE_UNDEFINED) &&
-	    ((emud->state == CHARGER) ||
-	     (emud->state == WHISPER_PPD)))
+	    (emud->state == CHARGER))
 		check_validity = 1;
 
 	switch_mux_mode(mode, check_validity);
@@ -929,6 +926,7 @@ static int configure_hardware(enum emu_det_accy accy)
 		gsbi_ctrl_reg_restore();
 		standard_mode_enable();
 		external_5V_disable();
+		emud->is_chg_plugged_in = false;
 		break;
 
 	case ACCY_WHISPER_SMART:
@@ -946,27 +944,18 @@ static int configure_hardware(enum emu_det_accy accy)
 		disable_se1_detection();
 		gsbi_ctrl_reg_store();
 		external_5V_disable();
-		if (emud->state == WHISPER_PPD)
-			msleep(DELAY_100MS);
-		else
-			emu_det_enable_irq(EMU_SCI_OUT_IRQ);
+		emu_det_enable_irq(EMU_SCI_OUT_IRQ);
 		emu_det_disable_irq(SEMU_PPD_DET_IRQ);
+		emud->is_chg_plugged_in = true;
 		break;
 
 	case ACCY_WHISPER_PPD:
 		disable_se1_detection();
 		gsbi_ctrl_reg_store();
-		external_5V_enable();
-		if (emud->state == CHARGER) {
-		  /*
-		   * Adding a delay here causes unexpected USB UnderVoltage
-		   * & USB OverVoltage interrupts during sleep period. This
-		   * comment is added for further investigation.
-		  */
-		  /*  msleep(delay in msec); */
-		} else
-			emu_det_enable_irq(EMU_SCI_OUT_IRQ);
+		external_5V_disable();
+		emu_det_enable_irq(EMU_SCI_OUT_IRQ);
 		emu_det_enable_irq(SEMU_PPD_DET_IRQ);
+		emud->is_chg_plugged_in = false;
 		break;
 
 	case ACCY_USB_DEVICE:
@@ -1061,8 +1050,7 @@ static void notify_whisper_switch(enum emu_det_accy accy)
 {
 	struct emu_det_data *data = the_emud;
 
-	if ((accy == ACCY_CHARGER) ||
-		(accy == ACCY_WHISPER_PPD)) {
+	if ((accy == ACCY_CHARGER) || (accy == ACCY_WHISPER_PPD)) {
 		switch_set_state(&data->wsdev, DOCKED);
 		pr_emu_det(PARANOIC, "whisper switch set to DOCKED\n");
 	/* LD2 open->close */
@@ -1107,6 +1095,9 @@ static void whisper_audio_check(void)
 	if (!switch_get_state(&data->dsdev))
 		return;
 
+	if (data->accy == ACCY_WHISPER_PPD)
+		goto exit;
+
 	if (test_bit(PD_200K_BIT, &data->sense)) {
 		audio = EMU_OUT;
 		pr_emu_det(DEBUG, "HEADSET attached\n");
@@ -1116,97 +1107,11 @@ static void whisper_audio_check(void)
 		standard_mode_enable();
 	}
 
+ exit:
 	switch_set_state(&data->asdev, audio);
 	blocking_notifier_call_chain(&semu_audio_notifier_list,
 				     (unsigned long)audio,
 				     (void *)NULL);
-}
-
-static void spd_check(void)
-{
-	struct emu_det_data *data = the_emud;
-
-	emu_det_disable_irq(EMU_SCI_OUT_IRQ);
-	pm8921_charger_unregister_vbus_sn(0);
-	external_5V_disable();
-	msleep(VBUS_ADC_READ_SETTLE_TIME);
-	if (adc_vbus_get() > VBUS_5V_LIMIT) {
-		if (data->whisper_auth == AUTH_PASSED) {
-			pr_emu_det(STATUS, "PPD->SPD transition\n");
-			notify_accy(ACCY_CHARGER);
-			data->state = CHARGER;
-		} else {
-			data->state = CONFIG;
-			queue_delayed_work(data->wq, &data->work, 0);
-		}
-	} else {
-		if (data->whisper_auth == AUTH_FAILED)
-			external_5V_disable();
-		else
-			external_5V_enable();
-		/*
-		 * This dealy is added to avoid
-		 * erroneous IDGND interrupts
-		 */
-		msleep(DELAY_100MS);
-	}
-
-	pm8921_charger_register_vbus_sn(&emu_det_vbus_state);
-	emu_det_enable_irq(EMU_SCI_OUT_IRQ);
-}
-
-static void verify_vbus_decayed(void)
-{
-	struct emu_det_data *data = the_emud;
-	unsigned int delay;
-	int vbus_voltage;
-	bool verify_done = false;
-
-	/*
-	 * The dock turns OFF the VBUS2SWB switch if the CHARGER
-	 * voltage drops below 1.8V. To avoid turning ON the SWB+
-	 * before VBUS < 1.8V , the adc is read with an incremental
-	 * delay of 100ms, 200ms, 400ms ... until the incremental delay
-	 * is > 1s.
-	 */
-	for (delay = DELAY_100MS; ; delay += delay) {
-		msleep(delay);
-		emu_det_disable_irq(EMU_SCI_OUT_IRQ);
-		pm8921_charger_unregister_vbus_sn(0);
-		vbus_voltage = adc_vbus_get();
-		if (vbus_voltage < VBUS_1DOT8V_LIMIT) {
-			/*
-			 * A delay of 1 sec is given so that circuitry in
-			 * the dock could turn the VBUS2SWB switch OFF before
-			 * turning the SWB+ ON.
-			 */
-			msleep(DELAY_1S);
-			/*
-			 * Recheck if the CHARGER was inserted in the above
-			 * time frame
-			 */
-			vbus_voltage = adc_vbus_get();
-			if (vbus_voltage <  VBUS_1DOT8V_LIMIT) {
-				emu_id_protection_off();
-				notify_whisper_switch(ACCY_WHISPER_PPD);
-				notify_accy(ACCY_WHISPER_PPD);
-				data->state = WHISPER_PPD;
-			}
-			verify_done = true;
-		} else if (delay > DELAY_1S) {
-			if (vbus_voltage <  VBUS_5V_LIMIT) {
-				data->state = CONFIG;
-				queue_delayed_work(data->wq, &data->work, 0);
-			}
-			verify_done = true;
-		}
-
-		pm8921_charger_register_vbus_sn(&emu_det_vbus_state);
-		emu_det_enable_irq(EMU_SCI_OUT_IRQ);
-
-		if (verify_done)
-			break;
-	}
 }
 
 #define POLL_TIME		(100 * HZ/1000) /* 100 msec */
@@ -1311,15 +1216,13 @@ static void detection_work(void)
 			notify_accy(ACCY_CHARGER);
 			notify_whisper_switch(ACCY_CHARGER);
 			data->state = CHARGER;
-
 		} else if (SENSE_WHISPER_PPD) {
 			pr_emu_det(STATUS,
 				"detection_work: PPD Identified\n");
 			emu_id_protection_off();
 			notify_accy(ACCY_WHISPER_PPD);
 			notify_whisper_switch(ACCY_WHISPER_PPD);
-			data->state = WHISPER_PPD;
-
+			data->state = CHARGER;
 		} else {
 			pr_emu_det(DEBUG, "no accessory\n");
 			notify_accy(ACCY_NONE);
@@ -1381,13 +1284,14 @@ static void detection_work(void)
 		if (!test_bit(SESS_VLD_BIT, &data->sense) &&
 		    !test_bit(FLOAT_BIT, &data->sense) &&
 		    (data->whisper_auth ==  AUTH_PASSED)) {
-			pr_emu_det(STATUS, "detection_work:" \
-					" SPD->PPD transition\n");
 			/* SPD->PPD transition */
-			verify_vbus_decayed();
+			pr_emu_det(STATUS, "SPD->PPD transition\n");
+			emu_id_protection_off();
+			notify_accy(ACCY_WHISPER_PPD);
+			notify_whisper_switch(ACCY_WHISPER_PPD);
+			whisper_audio_check();
 		} else if (!test_bit(SESS_VLD_BIT, &data->sense) &&
-			    test_bit(SESS_END_BIT, &data->sense) &&
-			   (data->whisper_auth != AUTH_IN_PROGRESS)) {
+			    test_bit(SESS_END_BIT, &data->sense)) {
 			/* charger disconnect */
 			data->state = CONFIG;
 			queue_delayed_work(data->wq, &data->work, 0);
@@ -1397,27 +1301,13 @@ static void detection_work(void)
 			/* insertion and removal of audio cable */
 			whisper_audio_check();
 		}
-		break;
 
-	case WHISPER_PPD:
-		pr_emu_det(STATUS, "detection_work: PPD\n");
-		last_irq = get_sense();
-
-		if (test_bit(FLOAT_BIT, &data->sense) &&
-		    (data->whisper_auth != AUTH_IN_PROGRESS)) {
-			data->state = CONFIG;
-			queue_delayed_work(data->wq, &data->work, 0);
-		} else if ((last_irq == data->emu_irq[EMU_SCI_OUT_IRQ]) ||
-			   whisper_ioctl_status) {
-			switch (data->whisper_auth) {
-			case AUTH_PASSED:
-				whisper_audio_check();
-			case AUTH_FAILED:
-			case AUTH_NOT_STARTED:
-				spd_check();
-			default:
-				break;
-			}
+		if ((!data->is_chg_plugged_in) &&
+		    (test_bit(SESS_VLD_BIT, &data->sense))) {
+			pr_emu_det(STATUS, "PPD->SPD transition\n");
+			notify_accy(ACCY_CHARGER);
+			notify_whisper_switch(ACCY_CHARGER);
+			whisper_audio_check();
 		}
 		break;
 
@@ -2084,12 +1974,18 @@ static long emu_det_ioctl(struct file *file,
 
 		pr_emu_det(STATUS, "ioctl cmd = 0x%04x\n", request.cmd);
 
-		if ((data->state == CHARGER) || (data->state == WHISPER_PPD)) {
+		if (data->state == CHARGER) {
 			if (request.cmd & CPCAP_WHISPER_ENABLE_UART) {
 				if (emu_pdata->cfg_l2_err)
 					emu_pdata->cfg_l2_err(0);
 				data->whisper_auth = AUTH_IN_PROGRESS;
 				mux_ctrl_mode(MUXMODE_UART);
+				if (data->accy == ACCY_WHISPER_PPD) {
+					emu_det_disable_irq(EMU_SCI_OUT_IRQ);
+					emu_det_disable_irq(SEMU_PPD_DET_IRQ);
+					pm8921_charger_unregister_vbus_sn(0);
+					external_5V_enable();
+				}
 			}
 
 			if (request.cmd & CPCAP_WHISPER_MODE_PU)
@@ -2106,6 +2002,14 @@ static long emu_det_ioctl(struct file *file,
 			pr_emu_det(STATUS, "Whisper_auth =%d\n",
 							data->whisper_auth);
 			if (!(request.cmd & CPCAP_WHISPER_ENABLE_UART)) {
+				if (data->accy == ACCY_WHISPER_PPD) {
+					external_5V_disable();
+					emu_det_enable_irq(EMU_SCI_OUT_IRQ);
+					emu_det_enable_irq(SEMU_PPD_DET_IRQ);
+					pm8921_charger_register_vbus_sn
+						(&emu_det_vbus_state);
+				}
+
 				if (emu_pdata->cfg_l2_err)
 					emu_pdata->cfg_l2_err(1);
 				if (dock != CHARGER_DOCK)
@@ -2245,6 +2149,7 @@ static int emu_det_probe(struct platform_device *pdev)
 	data->suspend_disabled = false;
 	data->driver_mode = MODE_NORMAL;
 	data->whisper_ioctl_context = false;
+	data->is_chg_plugged_in = false;
 	dev_set_drvdata(&pdev->dev, data);
 
 	data->trans = otg_get_transceiver();

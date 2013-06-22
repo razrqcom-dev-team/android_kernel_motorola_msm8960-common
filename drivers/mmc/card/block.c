@@ -860,6 +860,15 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 	do {
 		u32 readcmd, writecmd;
 
+		/*
+		 * We are starting card recovery or switching to single-block
+		 * read mode.  It can take a while, so don't allow suspend to
+		 * avoid a potential DPM timeout.
+		 */
+		if ((disable_multi || retry == 1) &&
+			!wake_lock_active(&card->host->recovery_wake_lock))
+			wake_lock(&card->host->recovery_wake_lock);
+
 		memset(&brq, 0, sizeof(struct mmc_blk_request));
 		brq.mrq.cmd = &brq.cmd;
 		brq.mrq.data = &brq.data;
@@ -987,9 +996,11 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 		if (brq.sbc.error || brq.cmd.error || brq.stop.error) {
 			switch (mmc_blk_cmd_recovery(card, req, &brq)) {
 			case ERR_RETRY:
-				if (retry++ < 5)
+				if (retry++ < 5 &&
+					!(mq->flags & MMC_QUEUE_SUSPENDED))
 					continue;
 			case ERR_ABORT:
+				goto cmd_failure;
 			case ERR_NOMEDIUM:
 				goto cmd_abort;
 			case ERR_CONTINUE:
@@ -1005,7 +1016,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 		if (brq.cmd.resp[0] & CMD_ERRORS) {
 			pr_err("%s: r/w command failed, status = %#x\n",
 				req->rq_disk->disk_name, brq.cmd.resp[0]);
-			goto cmd_abort;
+			goto cmd_failure;
 		}
 
 		/*
@@ -1037,12 +1048,10 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 			} while (busy && timeout > 0);
 		}
 
-		if ((mmc_card_sd(card)) && !timeout) {
-			pr_err("%s: Bad sdcard, removed it please!!!",
+		if (!(card->host->caps & MMC_CAP_NONREMOVABLE) && !timeout) {
+			pr_err("%s: card is stuck in programming state, aborting\n",
 				req->rq_disk->disk_name);
-			set_bit(BDI_removing, &md->disk->queue->backing_dev_info.state);
-			req->cmd_flags |= REQ_QUIET;
-			goto cmd_abort;
+			goto cmd_failure;
 		}
 
 		if (brq.data.error) {
@@ -1069,6 +1078,18 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 				spin_lock_irq(&md->lock);
 				ret = __blk_end_request(req, -EIO, brq.data.blksz);
 				spin_unlock_irq(&md->lock);
+
+				/*
+				 * If we get into this mode of operation and
+				 * the trouble continues, we will not get out
+				 * along the normal error path until all of the
+				 * single transfers are done.
+				 */
+				if (mmc_card_recoverable(card)) {
+					if (card->infirmity >= MMC_MAX_CARD_INFIRMITY)
+						goto cmd_failure;
+					card->infirmity++;
+				}
 				continue;
 			} else {
 				goto cmd_err;
@@ -1081,7 +1102,49 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 		spin_lock_irq(&md->lock);
 		ret = __blk_end_request(req, 0, brq.data.bytes_xfered);
 		spin_unlock_irq(&md->lock);
+		continue;
+
+cmd_failure:
+		/*
+		 * Keep track of recoverable cards that are not stable and
+		 * attempt to recover them if necessary.
+		 */
+		if (mmc_card_recoverable(card)) {
+			card->infirmity++;
+			if (card->infirmity >= MMC_MAX_CARD_INFIRMITY) {
+				card->host->failures++;
+				pr_err("%s: card has experienced %d semi-"
+					"consecutive errors and %u failures\n",
+					req->rq_disk->disk_name,
+					card->infirmity,
+					card->host->failures);
+
+				if (!(card->host->caps & MMC_CAP_NONREMOVABLE) &&
+				    card->host->failures >= MMC_MAX_FAILURES) {
+					mmc_card_set_removed(card);
+					mmc_detect_change(card->host, 0);
+					goto cmd_abort;
+				}
+
+				pr_info("%s: trying to recover\n",
+					req->rq_disk->disk_name);
+				mmc_reset_host(card->host);
+				card->infirmity = 0;
+			}
+
+			if (card->infirmity > 0)
+				pr_info("%s: card infirmity score: %d\n",
+					req->rq_disk->disk_name,
+					card->infirmity);
+		} else
+			goto cmd_abort;
 	} while (ret);
+
+	/*
+	 * Improve the card's health score on success.
+	 */
+	if (card->infirmity > 0)
+		card->infirmity--;
 
 	return 1;
 
@@ -1094,7 +1157,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 	 * as reported by the controller (which might be less than
 	 * the real number of written sectors, but never more).
 	 */
-	if (mmc_card_sd(card)) {
+	if (mmc_card_sd(card) && !(mq->flags & MMC_QUEUE_SUSPENDED)) {
 		u32 blocks;
 
 		blocks = mmc_sd_num_wr_blocks(card);
@@ -1155,6 +1218,8 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	}
 
 out:
+	if (wake_lock_active(&card->host->recovery_wake_lock))
+		wake_unlock(&card->host->recovery_wake_lock);
 	mmc_release_host(card->host);
 	return ret;
 }

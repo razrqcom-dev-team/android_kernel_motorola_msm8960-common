@@ -106,12 +106,12 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 	}
 
 	if (err && cmd->retries && !mmc_card_removed(host->card)) {
-		pr_debug("%s: req failed (CMD%u): %d, retrying...\n",
-			mmc_hostname(host), cmd->opcode, err);
-
-		cmd->retries--;
-		cmd->error = 0;
-		host->ops->request(host, mrq);
+		/*
+		 * mmc_request_done() can be called from interrupt context
+		 * so move retry logic to mmc_wait_for_req()
+		 */
+		if (mrq->done)
+			mrq->done(mrq);
 	} else {
 		led_trigger_event(host->led, LED_OFF);
 
@@ -250,7 +250,21 @@ void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 
 	mmc_start_request(host, mrq);
 
-	wait_for_completion_io(&complete);
+	while (1) {
+		struct mmc_command *cmd;
+
+		wait_for_completion_io(&complete);
+
+		cmd = mrq->cmd;
+		if (!cmd->error || !cmd->retries)
+			break;
+
+		pr_debug("%s: req failed (CMD%u): %d, retrying...\n",
+			mmc_hostname(host), cmd->opcode, cmd->error);
+		cmd->retries--;
+		cmd->error = 0;
+		host->ops->request(host, mrq);
+	}
 }
 
 EXPORT_SYMBOL(mmc_wait_for_req);
@@ -1753,6 +1767,13 @@ void mmc_rescan(struct work_struct *work)
 	mmc_bus_put(host);
 	mmc_bus_get(host);
 
+	/* Don't redetect if the card has failed too many times */
+	if (host->failures >= MMC_MAX_FAILURES) {
+		pr_err("%s: ignoring bad card\n", mmc_hostname(host));
+		mmc_bus_put(host);
+		goto out;
+	}
+
 	/* if there still is a card present, stop here */
 	if (host->bus_ops != NULL) {
 		mmc_bus_put(host);
@@ -1986,10 +2007,8 @@ EXPORT_SYMBOL(mmc_suspend_host);
  *	mmc_resume_host - resume a previously suspended host
  *	@host: mmc host
  */
-#define MMC_MAX_RESUME_ATTEMPTS 5
 int mmc_resume_host(struct mmc_host *host)
 {
-	int try = 0;
 	int err = 0;
 
 	mmc_bus_get(host);
@@ -2018,28 +2037,12 @@ int mmc_resume_host(struct mmc_host *host)
 		}
 		BUG_ON(!host->bus_ops->resume);
 		err = host->bus_ops->resume(host);
-
-		for (try = 1; err && try <= MMC_MAX_RESUME_ATTEMPTS; try++) {
-			printk(KERN_WARNING "%s: error %d during resume; "
-					    "trying to recover (attempt "
-					    "%d of %d)...\n",
-					    mmc_hostname(host), err, try,
-					    MMC_MAX_RESUME_ATTEMPTS);
-			mmc_power_off(host);
-			msleep(100 * try);	/* plenty of settling time */
-			mmc_power_up(host);
-			mmc_select_voltage(host, host->ocr);
-			msleep(100 * try);	/* take it slower each time */
-			err = host->bus_ops->resume(host);
-		}
 		if (err) {
 			printk(KERN_WARNING "%s: error %d during resume "
 					    "(card was removed?)\n",
 					    mmc_hostname(host), err);
 			err = 0;
-		} else if (try > 1)
-			printk(KERN_WARNING "%s: card recovery successful\n",
-					    mmc_hostname(host));
+		}
 	}
 	host->pm_flags &= ~MMC_PM_KEEP_POWER;
 	mmc_bus_put(host);
@@ -2047,6 +2050,19 @@ int mmc_resume_host(struct mmc_host *host)
 	return err;
 }
 EXPORT_SYMBOL(mmc_resume_host);
+
+int mmc_reset_host(struct mmc_host *host)
+{
+	int err;
+
+	err = mmc_suspend_host(host);
+	if (!err) {
+		mmc_delay(10);	/* let Vdd drain */
+		err = mmc_resume_host(host);
+	}
+	return err;
+}
+EXPORT_SYMBOL(mmc_reset_host);
 
 /* Do the card removal on suspend if card is assumed removeable
  * Do that in pm notifier while userspace isn't yet frozen, so we will be able

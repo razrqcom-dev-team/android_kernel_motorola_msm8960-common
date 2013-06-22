@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -282,6 +282,7 @@ struct pm8921_chg_chip {
 #ifdef CONFIG_PM8921_EXTENDED_INFO
 	unsigned int			step_charge_current;
 	unsigned int			step_charge_voltage;
+	unsigned int			step_charge_vinmin;
 	unsigned int			batt_alarm_delta;
 	unsigned int			lower_battery_threshold;
 	int64_t				batt_valid;
@@ -340,6 +341,31 @@ DECLARE_WORK(btm_config_work, btm_configure_work);
 static struct notifier_block pm8921_charging_reboot_notifier = {
 	.notifier_call = pm8921_charging_reboot,
 };
+
+ #define LPM_ENABLE_BIT  BIT(2)
+  static int pm8921_chg_set_lpm(struct pm8921_chg_chip *chip, int enable)
+  {
+          int rc;
+          u8 reg;
+  
+          rc = pm8xxx_readb(chip->dev->parent, CHG_CNTRL, &reg);
+          if (rc) {
+                  pr_err("pm8xxx_readb failed: addr=%03X, rc=%d\n",
+                                  CHG_CNTRL, rc);
+                  return rc;
+          }
+          reg &= ~LPM_ENABLE_BIT;
+          reg |= (enable ? LPM_ENABLE_BIT : 0);
+  
+          rc = pm8xxx_writeb(chip->dev->parent, CHG_CNTRL, reg);
+          if (rc) {
+                  pr_err("pm_chg_write failed: addr=%03X, rc=%d\n",
+                                  CHG_CNTRL, rc);
+                  return rc;
+          }
+  
+          return rc;
+  }
 
 static int pm_chg_masked_write(struct pm8921_chg_chip *chip, u16 addr,
 							u8 mask, u8 val)
@@ -1135,6 +1161,10 @@ static int is_battery_valid(struct pm8921_chg_chip *chip)
 				batt_data.step_charge_voltage;
 			pr_debug("step_charge_voltage = %d\n",
 				chip->step_charge_voltage);
+			chip->step_charge_vinmin =
+				batt_data.step_charge_vinmin;
+			pr_debug("step_charge_vinmin = %d\n",
+				chip->step_charge_vinmin);
 			pm8921_chg_hw_config(chip);
 		}
 		chip->batt_valid = batt_vld;
@@ -2075,8 +2105,10 @@ static void handle_usb_insertion_removal(struct pm8921_chg_chip *chip)
 	if (chip->usb_present ^ usb_present) {
 		notify_usb_of_the_plugin_event(usb_present);
 		chip->usb_present = usb_present;
+#ifndef CONFIG_EMU_DETECTION
 		power_supply_changed(&chip->usb_psy);
 		power_supply_changed(&chip->batt_psy);
+#endif
 	}
 	if (usb_present) {
 		schedule_delayed_work(&chip->unplug_check_work,
@@ -2608,8 +2640,10 @@ static irqreturn_t chg_gone_irq_handler(int irq, void *data)
 	schedule_work(&chip->unplug_ovp_fet_open_work);
 	pm8921_chg_disable_irq(chip, CHG_GONE_IRQ);
 
+#ifndef CONFIG_EMU_DETECTION
 	power_supply_changed(&chip->batt_psy);
 	power_supply_changed(&chip->usb_psy);
+#endif
 	return IRQ_HANDLED;
 }
 /*
@@ -2740,6 +2774,7 @@ static void pm_batt_external_power_changed(struct power_supply *psy)
 					 __pm_batt_external_power_changed_work);
 }
 
+#define PM8921_CHG_STEP_HYST 100
 /**
  * update_heartbeat - internal function to update userspace
  *		per update_time minutes
@@ -2835,11 +2870,14 @@ static void update_heartbeat(struct work_struct *work)
 		    chip->step_charge_voltage) {
 			pr_debug("Step Rate used Batt V = %d\n",
 				batt_mvolt);
+			pm_chg_vinmin_set(chip, chip->step_charge_vinmin);
 			pm_chg_ibatmax_set(chip, chip->step_charge_current);
-		} else {
+		} else if (batt_mvolt <= (chip->step_charge_voltage -
+					PM8921_CHG_STEP_HYST)) {
 			pr_debug("Step Rate NOT used Batt V = %d\n",
 				batt_mvolt);
 			pm_chg_ibatmax_set(chip, chip->max_bat_chg_current);
+			pm_chg_vinmin_set(chip, chip->vin_min);
 		}
 	}
 #endif
@@ -3542,6 +3580,9 @@ static int __devinit pm8921_chg_hw_init(struct pm8921_chg_chip *chip)
 {
 	int rc;
 
+	/* forcing 19p2mhz before accessing any charger registers */
+	pm8921_chg_force_19p2mhz_clk(chip);
+
 	detect_battery_removal(chip);
 
 	rc = pm_chg_masked_write(chip, SYS_CONFIG_2,
@@ -3729,7 +3770,7 @@ static int __devinit pm8921_chg_hw_init(struct pm8921_chg_chip *chip)
 	/* Disable EOC FSM processing */
 	pm8xxx_writeb(chip->dev->parent, CHG_BUCK_CTRL_TEST3, 0x91);
 
-	pm8921_chg_force_19p2mhz_clk(chip);
+	//pm8921_chg_force_19p2mhz_clk(chip);
 
 	rc = pm_chg_masked_write(chip, CHG_CNTRL, VREF_BATT_THERM_FORCE_ON,
 						VREF_BATT_THERM_FORCE_ON);
@@ -3835,6 +3876,9 @@ static int pm8921_chg_accy_notify(struct notifier_block *nb,
 			pdata->force_therm_bias(the_chip->dev, 0);
 	}
 	else {
+		cancel_delayed_work(&the_chip->update_heartbeat_work);
+		schedule_delayed_work(&the_chip->update_heartbeat_work,
+				      msecs_to_jiffies(0));
 		if (pdata->force_therm_bias)
 			pdata->force_therm_bias(the_chip->dev, 1);
 	}
@@ -4201,7 +4245,13 @@ static int pm8921_charger_suspend_noirq(struct device *dev)
 	rc = pm_chg_masked_write(chip, CHG_CNTRL, VREF_BATT_THERM_FORCE_ON, 0);
 	if (rc)
 		pr_err("Failed to Force Vref therm off rc=%d\n", rc);
+
+    rc = pm8921_chg_set_lpm(chip, 1);
+    if (rc)
+           pr_err("Failed to set lpm rc=%d\n", rc);
+
 	pm8921_chg_set_hw_clk_switching(chip);
+
 	return 0;
 }
 
@@ -4209,6 +4259,10 @@ static int pm8921_charger_resume_noirq(struct device *dev)
 {
 	int rc;
 	struct pm8921_chg_chip *chip = dev_get_drvdata(dev);
+
+	rc = pm8921_chg_set_lpm(chip, 0);
+    if (rc)
+            pr_err("Failed to set lpm rc=%d\n", rc);
 
 	pm8921_chg_force_19p2mhz_clk(chip);
 

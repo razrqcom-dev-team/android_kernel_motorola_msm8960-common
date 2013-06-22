@@ -615,7 +615,6 @@ static void enable_acl(struct msm_fb_data_type *mfd)
 		/*
 		 * Todo: add 50us delay between frame and cmd or between frames
 		 */
-		mipi_mot_mipi_busy_wait(mfd);
 		mipi_set_tx_power_mode(0);
 		ACL_enable_disable_settings[1] = mot_panel->acl_enabled;
 		mipi_dsi_cmds_tx(mfd, dsi_tx_buf, acl_enable_disable,
@@ -810,9 +809,8 @@ static void panel_set_backlight(struct msm_fb_data_type *mfd)
 	set_brightness_cmds[0].payload = getGamma(idx);
 
 	mutex_lock(&mfd->dma->ov_mutex);
-	/* Todo: add 50us delay between frame and cmd or between frames */
-	mipi_mot_mipi_busy_wait(mfd);
 
+	/* Todo: add 50us delay between frame and cmd or between frames */
 	mipi_set_tx_power_mode(0);
 	mipi_dsi_cmds_tx(mfd, dsi_tx_buf, set_brightness_cmds,
 			ARRAY_SIZE(set_brightness_cmds));

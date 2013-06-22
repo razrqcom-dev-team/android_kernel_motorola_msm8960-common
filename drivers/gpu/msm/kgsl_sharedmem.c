@@ -517,7 +517,6 @@ kgsl_sharedmem_vmalloc(struct kgsl_memdesc *memdesc,
 	BUG_ON(size == 0);
 
 	size = ALIGN(size, PAGE_SIZE * 2);
-
 	ret =  _kgsl_sharedmem_vmalloc(memdesc, pagetable, size,
 		GSL_PT_PAGE_RV | GSL_PT_PAGE_WV);
 	if (!ret)

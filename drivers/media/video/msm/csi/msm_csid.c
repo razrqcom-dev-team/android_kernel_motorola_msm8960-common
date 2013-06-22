@@ -188,6 +188,7 @@ static int msm_csid_init(struct v4l2_subdev *sd, uint32_t *csid_version)
 #if DBG_CSID
 	enable_irq(csid_dev->irq->start);
 #endif
+
 	return 0;
 
 clk_enable_failed:

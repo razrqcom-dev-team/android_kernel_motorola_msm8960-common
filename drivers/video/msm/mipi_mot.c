@@ -308,19 +308,28 @@ static int panel_disable(struct platform_device *pdev)
 	if (ret != 0)
 		goto err;
 
-	atomic_set(&mot_panel.state, MOT_PANEL_OFF);
 	if (!factory_run && mot_panel.esd_enabled &&
 				(mot_panel.esd_detection_run == true)) {
 		cancel_delayed_work(&mot_panel.esd_work);
 		mot_panel.esd_detection_run = false;
 	}
 
-	if (mot_panel.panel_disable)
-		mot_panel.panel_disable(mfd);
-	else {
-		pr_err("%s: no panel support\n", __func__);
-		ret = -ENODEV;
-		goto err1;
+	/*
+	 * The panel_state might be off because with the video_mode
+	 * panel, during phone suspend needs to call panel_off
+	 * to shut down panel before turn off the timing generator
+	 * to avoid the image fading away
+	 */
+	if (atomic_read(&mot_panel.state) == MOT_PANEL_ON) {
+		atomic_set(&mot_panel.state, MOT_PANEL_OFF);
+
+		if (mot_panel.panel_disable)
+			mot_panel.panel_disable(mfd);
+		else {
+			pr_err("%s: no panel support\n", __func__);
+			ret = -ENODEV;
+			goto err1;
+		}
 	}
 
 	pr_info("%s completed\n", __func__);
@@ -384,7 +393,9 @@ static int panel_off(struct platform_device *pdev)
 
 	if (mot_panel.panel_off) {
 		atomic_set(&mot_panel.state, MOT_PANEL_OFF);
+		mutex_lock(&mfd->dma->ov_mutex);
 		mot_panel.panel_off(mfd);
+		mutex_unlock(&mfd->dma->ov_mutex);
 		pr_debug("MIPI MOT Panel OFF\n");
 	}
 	return 0;
@@ -412,7 +423,6 @@ static int mot_panel_off_reboot(struct notifier_block *nb,
 		mutex_lock(&mfd->dma->ov_mutex);
 
 		atomic_set(&mot_panel->state, MOT_PANEL_OFF);
-		mipi_mot_mipi_busy_wait(mfd);
 		if (mot_panel->panel_disable)
 			mot_panel->panel_disable(mfd);
 
