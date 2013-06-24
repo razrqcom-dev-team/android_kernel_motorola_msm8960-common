@@ -463,7 +463,7 @@ static int __init msm_rtb_set_buffer_size(char *p)
 	int s;
 
 	s = memparse(p, NULL);
-	msm8960_rtb_pdata.size = ALIGN(s, SZ_4K);
+	msm_rtb_pdata.size = ALIGN(s, SZ_4K);
 	return 0;
 }
 early_param("msm_rtb_size", msm_rtb_set_buffer_size);
@@ -481,7 +481,7 @@ static struct platform_device msm_rtb_device = {
 static void __init reserve_rtb_memory(void)
 {
 #if defined(CONFIG_MSM_RTB)
-	msm8960_reserve_table[MEMTYPE_EBI1].size += msm8960_rtb_pdata.size;
+	msm8960_reserve_table[MEMTYPE_EBI1].size += msm_rtb_pdata.size;
 	pr_info("mem_map: rtb reserved with size 0x%x in pool\n",
 		msm8960_rtb_pdata.size);
 #endif
