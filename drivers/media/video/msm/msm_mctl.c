@@ -21,6 +21,7 @@
 #include <linux/proc_fs.h>
 #include <linux/vmalloc.h>
 #include <linux/wakelock.h>
+//#include <linux/avtimer.h> //Uncomment to enable VT Use case
 
 #include <media/v4l2-dev.h>
 #include <media/v4l2-ioctl.h>
@@ -545,10 +546,15 @@ static int msm_mctl_cmd(struct msm_cam_media_controller *p_mctl,
 		break;
 
 	default:
-		/* ISP config*/
-		D("%s:%d: go to default. Calling msm_isp_config\n",
-			__func__, __LINE__);
-		rc = p_mctl->isp_config(p_mctl, cmd, arg);
+		if(p_mctl && p_mctl->isp_config) {
+			/* ISP config*/
+			D("%s:%d: go to default. Calling msm_isp_config\n",
+				__func__, __LINE__);
+			rc = p_mctl->isp_config(p_mctl, cmd, arg);
+		} else {
+			rc = -EINVAL;
+			pr_err("%s: media controller is null\n", __func__);
+		}
 		break;
 	}
 	D("%s: !!! cmd = %d, rc = %d\n",
@@ -864,6 +870,10 @@ static int msm_mctl_dev_open(struct file *f)
 	mutex_init(&pcam_inst->inst_lock);
 	pcam->mctl_node.dev_inst[i] = pcam_inst;
 
+	pcam_inst->avtimerOn = 0;
+	pcam_inst->p_avtimer_msw = NULL;
+	pcam_inst->p_avtimer_lsw = NULL;
+
 	D("%s pcam_inst %p my_index = %d\n", __func__,
 		pcam_inst, pcam_inst->my_index);
 	rc = msm_cam_server_open_mctl_session(pcam,
@@ -964,6 +974,15 @@ static int msm_mctl_dev_close(struct file *f)
 	pcam_inst->streamon = 0;
 	pcam->mctl_node.use_count--;
 	pcam->mctl_node.dev_inst_map[pcam_inst->image_mode] = NULL;
+
+	if(pcam_inst->avtimerOn){
+	    iounmap(pcam_inst->p_avtimer_lsw);
+	    iounmap(pcam_inst->p_avtimer_msw);
+	    //Turn OFF DSP/Enable power collapse
+	    /*avcs_core_disable_power_collapse(0);*/ //Uncomment to enable VT Use case
+	    pcam_inst->avtimerOn = 0;
+	}
+
 	if (pcam_inst->vbqueue_initialized)
 		vb2_queue_release(&pcam_inst->vid_bufq);
 	D("%s Closing down instance %p ", __func__, pcam_inst);
@@ -1073,6 +1092,16 @@ static int msm_mctl_v4l2_s_ctrl(struct file *f, void *pctx,
 				pcam_inst->plane_info.num_planes,
 				pcam_inst->plane_info.plane[0].size,
 				pcam_inst->plane_info.plane[1].size);
+	} else if (ctrl->id == MSM_V4L2_PID_AVTIMER){
+		pcam_inst->avtimerOn = ctrl->value;
+		D("%s: mmap_inst=(0x%p, %d) AVTimer=%d\n",
+			 __func__, pcam_inst, pcam_inst->my_index, ctrl->value);
+                /*Kernel drivers to access AVTimer*/
+		/*avcs_core_open();*/ //Uncomment to enable VT Use case
+                // Turn ON DSP/Disable power collapse
+		/*avcs_core_disable_power_collapse(1);*/ //Uncomment to enable VT Use case
+		pcam_inst->p_avtimer_lsw = ioremap(AVTIMER_LSW_PHY_ADDR, 4);
+		pcam_inst->p_avtimer_msw = ioremap(AVTIMER_MSW_PHY_ADDR, 4);
 	} else
 		pr_err("%s Unsupported S_CTRL Value ", __func__);
 
@@ -1592,7 +1621,7 @@ static int msm_mctl_v4l2_subscribe_event(struct v4l2_fh *fh,
 
 	if (sub->type == V4L2_EVENT_ALL)
 		sub->type = V4L2_EVENT_PRIVATE_START+MSM_CAM_APP_NOTIFY_EVENT;
-	rc = v4l2_event_subscribe(fh, sub, 30);
+	rc = v4l2_event_subscribe(fh, sub, 100);
 	if (rc < 0)
 		pr_err("%s: failed for evtType = 0x%x, rc = %d\n",
 						__func__, sub->type, rc);
