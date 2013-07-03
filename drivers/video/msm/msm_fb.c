@@ -126,8 +126,8 @@ static int msm_fb_pan_idle(struct msm_fb_data_type *mfd);
 #define MSM_FB_MAX_DBGFS 1024
 #define MAX_BACKLIGHT_BRIGHTNESS 255
 
-#define WAIT_FENCE_FIRST_TIMEOUT MSEC_PER_SEC
-#define WAIT_FENCE_FINAL_TIMEOUT 10 * MSEC_PER_SEC
+#define WAIT_FENCE_FIRST_TIMEOUT (3 * MSEC_PER_SEC)
+#define WAIT_FENCE_FINAL_TIMEOUT (10 * MSEC_PER_SEC)
 /* Display op timeout should be greater than total timeout */
 #define WAIT_DISP_OP_TIMEOUT (WAIT_FENCE_FIRST_TIMEOUT +\
         WAIT_FENCE_FINAL_TIMEOUT) * MDP_MAX_FENCE_FD
@@ -1777,7 +1777,7 @@ static int msm_fb_open(struct fb_info *info, int user)
 	}
 
 	if (mfd->op_enable == 0) {
-		if (info->node == 2)
+		if (!mfd->ref_cnt && info->node == 2)
 			return -EPERM;
 		/* if system is in suspend mode, do not unblank */
 		mfd->ref_cnt++;

@@ -363,7 +363,11 @@ static int msm_camera_v4l2_dqbuf(struct file *f, void *pctx,
 		return -EACCES;
 	}
 	rc = vb2_dqbuf(&pcam_inst->vid_bufq, pb,  f->f_flags & O_NONBLOCK);
-	D("%s, videobuf_dqbuf returns %d\n", __func__, rc);
+	if (rc < 0) {
+		pr_err("%s, videobuf_dqbuf returns %d\n", __func__, rc);
+		mutex_unlock(&pcam_inst->inst_lock);
+		return rc;
+	}
 
 	if (pb->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 		/* Reject the buffer if planes array was not allocated */
@@ -459,7 +463,7 @@ static int msm_camera_v4l2_streamoff(struct file *f, void *pctx,
 		pr_err("%s: hw failed to stop streaming\n", __func__);
 
 	/* stop buffer streaming */
-	rc = vb2_streamoff(&pcam_inst->vid_bufq, buf_type);
+	vb2_streamoff(&pcam_inst->vid_bufq, buf_type);
 	D("%s, videobuf_streamoff returns %d\n", __func__, rc);
 
 	mutex_unlock(&pcam_inst->inst_lock);
@@ -762,7 +766,7 @@ static int msm_camera_v4l2_subscribe_event(struct v4l2_fh *fh,
 		return -EINVAL;
 	if (sub->type == V4L2_EVENT_ALL)
 		sub->type = V4L2_EVENT_PRIVATE_START+MSM_CAM_APP_NOTIFY_EVENT;
-	rc = v4l2_event_subscribe(fh, sub, 30);
+	rc = v4l2_event_subscribe(fh, sub, 100);
 	if (rc < 0)
 		D("%s: failed for evtType = 0x%x, rc = %d\n",
 						__func__, sub->type, rc);
@@ -990,6 +994,7 @@ static int msm_open(struct file *f)
 	}
 	pcam_inst->vbqueue_initialized = 0;
 	pcam_inst->sequence = 0;
+	pcam_inst->avtimerOn = 0;
 	rc = 0;
 
 	f->private_data = &pcam_inst->eventHandle;
@@ -1146,6 +1151,7 @@ static int msm_close(struct file *f)
 	}
 
 	pcam_inst->streamon = 0;
+	pcam_inst->avtimerOn = 0;
 	pcam->use_count--;
 	pcam->dev_inst_map[pcam_inst->image_mode] = NULL;
 	if (pcam_inst->vbqueue_initialized)
