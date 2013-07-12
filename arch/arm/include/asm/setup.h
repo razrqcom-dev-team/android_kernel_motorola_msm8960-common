@@ -294,20 +294,6 @@ struct meminfo {
 
 extern struct meminfo meminfo;
 
-#ifdef CONFIG_DONT_MAP_HOLE_IN_LOWMEM
-struct vmembank {
-	unsigned long start;
-	unsigned long delta;
-};
-
-struct vmeminfo {
-	int nr_banks;
-	struct vmembank vbank[NR_BANKS];
-};
-
-extern struct vmeminfo vmeminfo;
-#endif
-
 #define for_each_bank(iter,mi)				\
 	for (iter = 0; iter < (mi)->nr_banks; iter++)
 

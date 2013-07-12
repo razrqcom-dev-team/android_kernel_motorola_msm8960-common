@@ -117,38 +117,6 @@ void find_membank0_hole(void);
 	((MEMBANK1_PHYS_OFFSET && ((virt) >= MEMBANK1_PAGE_OFFSET)) ?	\
 	(virt) - MEMBANK1_PAGE_OFFSET + MEMBANK1_PHYS_OFFSET :	\
 	(virt) - MEMBANK0_PAGE_OFFSET + MEMBANK0_PHYS_OFFSET)
-#elif defined(CONFIG_DONT_MAP_HOLE_IN_LOWMEM)
-#include <asm/setup.h>
-#define __phys_to_virt(phys)						\
-({									\
-	unsigned long __ret = 0;					\
-	int __i;							\
-	for (__i = 0; __i < vmeminfo.nr_banks; __i++)			\
-		if (((phys) >= meminfo.bank[__i].start) &&		\
-			((phys) < (meminfo.bank[__i].start +		\
-				meminfo.bank[__i].size))) {		\
-			__ret = (phys) + vmeminfo.vbank[__i].delta;	\
-			break;						\
-		}							\
-	if (!__ret && !vmeminfo.nr_banks)				\
-		__ret = (phys) - PHYS_OFFSET + PAGE_OFFSET;		\
-	__ret;								\
-})
-#define __virt_to_phys(virt)						\
-({									\
-	unsigned long __ret = 0;					\
-	int __i;							\
-	for (__i = 0; __i < vmeminfo.nr_banks; __i++)			\
-		if (((virt) >= vmeminfo.vbank[__i].start) &&		\
-			((virt) < (vmeminfo.vbank[__i].start +		\
-				meminfo.bank[__i].size))) {		\
-			__ret = (virt) - vmeminfo.vbank[__i].delta;	\
-			break;						\
-		}							\
-	if (!__ret && !vmeminfo.nr_banks)				\
-		__ret = (virt) - PAGE_OFFSET + PHYS_OFFSET;		\
-	__ret;								\
-})
 #endif
 
 /*
