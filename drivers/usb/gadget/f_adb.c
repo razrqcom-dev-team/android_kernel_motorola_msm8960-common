@@ -663,6 +663,7 @@ static int adb_bind_config(struct usb_configuration *c)
 		adb_interface_desc.iInterface = status;
 	}
 
+
 	dev->cdev = c->cdev;
 	dev->function.name = "adb";
 	dev->function.descriptors = fs_adb_descs;

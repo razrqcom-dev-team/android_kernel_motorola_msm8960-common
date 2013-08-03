@@ -130,6 +130,7 @@ static int mipi_dsi_off(struct platform_device *pdev)
 
 	mipi_dsi_unprepare_clocks();
 	mipi_dsi_unprepare_ahb_clocks();
+
 	if (mipi_dsi_pdata && mipi_dsi_pdata->panel_power_save)
 		mipi_dsi_pdata->panel_power_save(0);
 
