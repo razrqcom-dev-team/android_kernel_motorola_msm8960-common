@@ -783,14 +783,14 @@ void mdp4_mipi_vsync_enable(struct msm_fb_data_type *mfd,
 	mdp_clk_ctrl(1);
 
 	data = inpdw(MDP_BASE + 0x20c);
-	if ((mfd->use_mdp_vsync) && (mfd->ibuf.vsync_enable) &&
+	if ((mfd->use_mdp_vsync) &&
 	    (mfd->panel_info.lcd.vsync_enable)) {
 		data |= tear_en;
 		/*
 		 * rdptr init and irq cannot be same due to h/w bug.
 		 * if they are same, rdptr irqs could be missed.
 		 */
-		if (mfd->panel_info.lcd.primary_vsync_init ||
+		if (mfd->panel_info.lcd.primary_vsync_init &&
 			mfd->panel_info.lcd.primary_rdptr_irq) {
 			MDP_OUTP(MDP_BASE + 0x128,
 				mfd->panel_info.lcd.primary_vsync_init);
