@@ -299,7 +299,7 @@ static int get_ctl_value_v1(struct usb_mixer_elem_info *cval, int request, int v
 		idx = snd_usb_ctrl_intf(chip) | (cval->id << 8);
 		if (snd_usb_ctl_msg(chip->dev, usb_rcvctrlpipe(chip->dev, 0), request,
 				    USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_IN,
-				    validx, idx, buf, val_len, 100) >= val_len) {
+				    validx, idx, buf, val_len) >= val_len) {
 			*value_ret = convert_signed_value(cval, snd_usb_combine_bytes(buf, val_len));
 			err = 0;
 			goto out;
@@ -344,7 +344,7 @@ static int get_ctl_value_v2(struct usb_mixer_elem_info *cval, int request, int v
 		idx = snd_usb_ctrl_intf(chip) | (cval->id << 8);
 		ret = snd_usb_ctl_msg(chip->dev, usb_rcvctrlpipe(chip->dev, 0), bRequest,
 			      USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_IN,
-			      validx, idx, buf, size, 1000);
+			      validx, idx, buf, size);
 	}
 	up_read(&chip->shutdown_rwsem);
 	snd_usb_autosuspend(chip);
@@ -461,7 +461,7 @@ int snd_usb_mixer_set_ctl_value(struct usb_mixer_elem_info *cval,
 		if (snd_usb_ctl_msg(chip->dev,
 				    usb_sndctrlpipe(chip->dev, 0), request,
 				    USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_OUT,
-				    validx, idx, buf, val_len, 100) >= 0) {
+				    validx, idx, buf, val_len) >= 0) {
 			err = 0;
 			goto out;
 		}
@@ -821,6 +821,9 @@ static void volume_control_quirks(struct usb_mixer_elem_info *cval,
 
 	case USB_ID(0x046d, 0x0808):
 	case USB_ID(0x046d, 0x0809):
+	case USB_ID(0x046d, 0x081b): /* HD Webcam c310 */
+	case USB_ID(0x046d, 0x081d): /* HD Webcam c510 */
+	case USB_ID(0x046d, 0x0825): /* HD Webcam c270 */
 	case USB_ID(0x046d, 0x0991):
 	/* Most audio usb devices lie about volume resolution.
 	 * Most Logitech webcams have res = 384.
@@ -960,7 +963,7 @@ static int mixer_ctl_feature_info(struct snd_kcontrol *kcontrol, struct snd_ctl_
 		if (!cval->initialized) {
 			get_min_max_with_quirks(cval, 0, kcontrol);
 			if (cval->initialized && cval->dBmin >= cval->dBmax) {
-				kcontrol->vd[0].access &=
+				kcontrol->vd[0].access &= 
 					~(SNDRV_CTL_ELEM_ACCESS_TLV_READ |
 					  SNDRV_CTL_ELEM_ACCESS_TLV_CALLBACK);
 				snd_ctl_notify(cval->mixer->chip->card,
@@ -1305,7 +1308,7 @@ static int parse_audio_feature_unit(struct mixer_build *state, int unitid, void 
 				build_feature_ctl(state, _ftr, 0, i, &iterm, unitid, 0);
 		}
 	} else { /* UAC_VERSION_2 */
-		for (i = 0; i < 30/2; i++) {
+		for (i = 0; i < ARRAY_SIZE(audio_feature_info); i++) {
 			unsigned int ch_bits = 0;
 			unsigned int ch_read_only = 0;
 
