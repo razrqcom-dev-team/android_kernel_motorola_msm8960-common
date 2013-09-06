@@ -355,18 +355,68 @@ struct afe_param_loopback_gain {
 	u16 reserved;
 } __attribute__ ((packed));
 
+/* Parameter ID used to configure and enable/disable the loopback path. The
+ * difference with respect to the existing API, AFE_PORT_CMD_LOOPBACK, is that
+ * it allows Rx port to be configured as source port in loopback path. Port-id
+ * in AFE_PORT_CMD_SET_PARAM cmd is the source port whcih can be Tx or Rx port.
+ * In addition, we can configure the type of routing mode to handle different
+ * use cases.
+*/
+enum {
+	/* Regular loopback from source to destination port */
+	LB_MODE_DEFAULT = 1,
+	/* Sidetone feed from Tx source to Rx destination port */
+	LB_MODE_SIDETONE,
+	/* Echo canceller reference, voice + audio + DTMF */
+	LB_MODE_EC_REF_VOICE_AUDIO,
+	/* Echo canceller reference, voice alone */
+	LB_MODE_EC_REF_VOICE
+};
+
+#define AFE_PARAM_ID_LOOPBACK_CONFIG 0x0001020B
+#define AFE_API_VERSION_LOOPBACK_CONFIG 0x1
+struct afe_param_loopback_cfg {
+	/* Minor version used for tracking the version of the configuration
+	 * interface.
+	 */
+	uint32_t loopback_cfg_minor_version;
+
+	/* Destination Port Id. */
+	uint16_t dst_port_id;
+
+	/* Specifies data path type from src to dest port. Supported values:
+	 * LB_MODE_DEFAULT
+	 * LB_MODE_SIDETONE
+	 * LB_MODE_EC_REF_VOICE_AUDIO
+	 * LB_MODE_EC_REF_VOICE
+	 */
+	uint16_t routing_mode;
+
+	/* Specifies whether to enable (1) or disable (0) an AFE loopback. */
+	uint16_t enable;
+
+	/* Reserved for 32-bit alignment. This field must be set to 0. */
+	uint16_t reserved;
+} __packed;
 
 #define AFE_MODULE_ID_PORT_INFO		0x00010200
-struct afe_param_payload {
+/* Module ID for the loopback-related parameters. */
+#define AFE_MODULE_LOOPBACK           0x00010205
+struct afe_param_payload_base {
 	u32 module_id;
 	u32 param_id;
 	u16 param_size;
 	u16 reserved;
+} __packed;
+
+struct afe_param_payload {
+	struct afe_param_payload_base base;
 	union {
 		struct afe_param_sidetone_gain sidetone_gain;
 		struct afe_param_sampling_rate sampling_rate;
 		struct afe_param_channels      channels;
 		struct afe_param_loopback_gain loopback_gain;
+		struct afe_param_loopback_cfg loopback_cfg;
 	} __attribute__((packed)) param;
 } __attribute__ ((packed));
 
@@ -524,19 +574,6 @@ struct adm_multi_ch_copp_open_command {
 	u32 rate;
 	u8 dev_channel_mapping[8];
 } __packed;
-
-struct adm_multi_channel_copp_open_v3 {
-	struct apr_hdr hdr;
-	u16 flags;
-	u16 mode;
-	u16 endpoint_id1;
-	u16 endpoint_id2;
-	u32 topology_id;
-	u16 channel_config;
-	u16 bit_width;
-	u32 rate;
-	u8  dev_channel_mapping[8];
-};
 #define ADM_CMD_MEMORY_MAP				0x00010C30
 struct adm_cmd_memory_map{
 	struct apr_hdr	hdr;
@@ -877,6 +914,7 @@ struct asm_multi_channel_pcm_fmt_blk {
 				 * An unused channel is set to zero.
 				 */
 };
+
 struct asm_adpcm_cfg {
 	u16 ch_cfg;
 	u16 bits_per_sample;
@@ -1180,6 +1218,23 @@ struct asm_stream_cmd_open_read_write {
 	u32                read_format;
 } __attribute__((packed));
 
+#define ASM_STREAM_CMD_OPEN_LOOPBACK	0x00010D6E
+struct asm_stream_cmd_open_loopback {
+	struct apr_hdr         hdr;
+	u32                    mode_flags;
+/* Mode flags.
+ * Bit 0-31: reserved; client should set these bits to 0
+ */
+	u16                    src_endpointype;
+	/* Endpoint type. 0 = Tx Matrix */
+	u16                    sink_endpointype;
+	/* Endpoint type. 0 = Rx Matrix */
+	u32                    postprocopo_id;
+/* Postprocessor topology ID. Specifies the topology of
+ * postprocessing algorithms.
+ */
+} __packed;
+
 #define ADM_CMD_CONNECT_AFE_PORT 0x00010320
 #define ADM_CMD_DISCONNECT_AFE_PORT 0x00010321
 
@@ -1356,7 +1411,7 @@ struct asm_stream_cmd_read{
 	u32	uid;
 } __attribute__((packed));
 
-#define ASM_DATA_CMD_READ_COMPRESSED                     0x00010DBC
+#define ASM_DATA_CMD_READ_COMPRESSED                     0x00010DBF
 struct asm_stream_cmd_read_compressed {
 	struct apr_hdr     hdr;
 	u32	buf_add;
@@ -1428,7 +1483,7 @@ struct asm_data_event_read_done{
 	u32            id;
 } __attribute__((packed));
 
-#define ASM_DATA_EVENT_READ_COMPRESSED_DONE              0x00010DBD
+#define ASM_DATA_EVENT_READ_COMPRESSED_DONE              0x00010DC0
 struct asm_data_event_read_compressed_done {
 	u32            status;
 	u32            buffer_add;
@@ -1585,4 +1640,36 @@ struct srs_trumedia_params {
 int srs_trumedia_open(int port_id, int srs_tech_id, void *srs_params);
 /* SRS TruMedia end */
 
+/* SRS Studio Sound 3D start */
+#define SRS_ID_SS3D_GLOBAL	0x00000001
+#define SRS_ID_SS3D_CTRL	0x00000002
+#define SRS_ID_SS3D_FILTER	0x00000003
+
+struct srs_SS3D_params_GLOBAL {
+	uint8_t                  v1;
+	uint8_t                  v2;
+	uint8_t                  v3;
+	uint8_t                  v4;
+	uint8_t                  v5;
+	uint8_t                  v6;
+	uint8_t                  v7;
+	uint8_t                  v8;
+} __packed;
+
+struct srs_SS3D_ctrl_params {
+	uint8_t				v[236];
+} __packed;
+
+struct srs_SS3D_filter_params {
+	uint8_t				v[28 + 2752];
+} __packed;
+
+struct srs_SS3D_params {
+	struct srs_SS3D_params_GLOBAL   global;
+	struct srs_SS3D_ctrl_params     ss3d;
+	struct srs_SS3D_filter_params   ss3d_f;
+} __packed;
+
+int srs_ss3d_open(int port_id, int srs_tech_id, void *srs_params);
+/* SRS Studio Sound 3D end */
 #endif /*_APR_AUDIO_H_*/

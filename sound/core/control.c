@@ -21,6 +21,7 @@
 
 #include <linux/threads.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/time.h>
@@ -1131,8 +1132,8 @@ static int snd_ctl_elem_add(struct snd_ctl_file *file,
 	long private_size;
 	struct user_element *ue;
 	int idx, err;
-	
-	if (card->user_ctl_count >= MAX_USER_CONTROLS)
+
+	if (!replace && card->user_ctl_count >= MAX_USER_CONTROLS)
 		return -ENOMEM;
 	if (info->count < 1)
 		return -EINVAL;
@@ -1315,7 +1316,7 @@ static int snd_ctl_tlv_ioctl(struct snd_ctl_file *file,
 			err = -EPERM;
 			goto __kctl_end;
 		}
-		err = kctl->tlv.c(kctl, op_flag, tlv.length, _tlv->tlv); 
+		err = kctl->tlv.c(kctl, op_flag, tlv.length, _tlv->tlv);
 		if (err > 0) {
 			up_read(&card->controls_rwsem);
 			snd_ctl_notify(card, SNDRV_CTL_EVENT_MASK_TLV, &kctl->id);

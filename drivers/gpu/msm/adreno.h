@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,10 +24,15 @@
 #define ADRENO_DEVICE(device) \
 		KGSL_CONTAINER_OF(device, struct adreno_device, dev)
 
+#define ADRENO_CHIPID_CORE(_id) (((_id) >> 24) & 0xFF)
+#define ADRENO_CHIPID_MAJOR(_id) (((_id) >> 16) & 0xFF)
+#define ADRENO_CHIPID_MINOR(_id) (((_id) >> 8) & 0xFF)
+#define ADRENO_CHIPID_PATCH(_id) ((_id) & 0xFF)
+
 /* Flags to control command packet settings */
 #define KGSL_CMD_FLAGS_NONE             0x00000000
 #define KGSL_CMD_FLAGS_PMODE		0x00000001
-#define KGSL_CMD_FLAGS_DUMMY_INTR_CMD	0x00000002
+#define KGSL_CMD_FLAGS_INTERNAL_ISSUE	0x00000002
 
 /* Command identifiers */
 #define KGSL_CONTEXT_TO_MEM_IDENTIFIER	0x2EADBEEF
@@ -109,8 +114,9 @@ struct adreno_gpudev {
 					struct adreno_context *);
 	irqreturn_t (*irq_handler)(struct adreno_device *);
 	void (*irq_control)(struct adreno_device *, int);
+	unsigned int (*irq_pending)(struct adreno_device *);
 	void * (*snapshot)(struct adreno_device *, void *, int *, int);
-	void (*rb_init)(struct adreno_device *, struct adreno_ringbuffer *);
+	int (*rb_init)(struct adreno_device *, struct adreno_ringbuffer *);
 	void (*start)(struct adreno_device *);
 	unsigned int (*busy_cycles)(struct adreno_device *);
 };

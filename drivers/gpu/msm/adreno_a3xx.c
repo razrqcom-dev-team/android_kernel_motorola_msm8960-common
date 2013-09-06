@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2346,7 +2346,7 @@ static void a3xx_drawctxt_save(struct adreno_device *adreno_dev,
 {
 	struct kgsl_device *device = &adreno_dev->dev;
 
-	if (context == NULL)
+	if (context == NULL || (context->flags & CTXT_FLAGS_BEING_DESTROYED))
 		return;
 
 	if (context->flags & CTXT_FLAGS_GPU_HANG)
@@ -2450,11 +2450,14 @@ static void a3xx_drawctxt_restore(struct adreno_device *adreno_dev,
 	}
 }
 
-static void a3xx_rb_init(struct adreno_device *adreno_dev,
+static int a3xx_rb_init(struct adreno_device *adreno_dev,
 			 struct adreno_ringbuffer *rb)
 {
 	unsigned int *cmds, cmds_gpu;
-	cmds = adreno_ringbuffer_allocspace(rb, 18);
+	cmds = adreno_ringbuffer_allocspace(rb, NULL, 18);
+	if (cmds == NULL)
+		return -ENOMEM;
+
 	cmds_gpu = rb->buffer_desc.gpuaddr + sizeof(uint) * (rb->wptr - 18);
 
 	GSL_RB_WRITE(cmds, cmds_gpu, cp_type3_packet(CP_ME_INIT, 17));
@@ -2478,6 +2481,8 @@ static void a3xx_rb_init(struct adreno_device *adreno_dev,
 	GSL_RB_WRITE(cmds, cmds_gpu, 0x00000000);
 
 	adreno_ringbuffer_submit(rb);
+
+	return 0;
 }
 
 static void a3xx_err_callback(struct adreno_device *adreno_dev, int bit)
@@ -2555,21 +2560,7 @@ static void a3xx_cp_callback(struct adreno_device *adreno_dev, int irq)
 {
 	struct adreno_ringbuffer *rb = &adreno_dev->ringbuffer;
 
-	if (irq == A3XX_INT_CP_RB_INT) {
-		unsigned int context_id;
-		kgsl_sharedmem_readl(&adreno_dev->dev.memstore,
-				&context_id,
-				KGSL_MEMSTORE_OFFSET(KGSL_MEMSTORE_GLOBAL,
-					current_context));
-		if (context_id < KGSL_MEMSTORE_MAX) {
-			kgsl_sharedmem_writel(&rb->device->memstore,
-					KGSL_MEMSTORE_OFFSET(context_id,
-						ts_cmp_enable), 0);
-			wmb();
-		}
-		KGSL_CMD_WARN(rb->device, "ringbuffer rb interrupt\n");
-	}
-
+	/* Wake up everybody waiting for the interrupt */
 	wake_up_interruptible_all(&rb->device->wait_queue);
 
 	/* Schedule work to free mem and issue ibs */
@@ -2666,6 +2657,15 @@ static void a3xx_irq_control(struct adreno_device *adreno_dev, int state)
 		adreno_regwrite(device, A3XX_RBBM_INT_0_MASK, A3XX_INT_MASK);
 	else
 		adreno_regwrite(device, A3XX_RBBM_INT_0_MASK, 0);
+}
+
+static unsigned int a3xx_irq_pending(struct adreno_device *adreno_dev)
+{
+	unsigned int status;
+
+	adreno_regread(&adreno_dev->dev, A3XX_RBBM_INT_0_STATUS, &status);
+
+	return (status & A3XX_INT_MASK) ? 1 : 0;
 }
 
 static unsigned int a3xx_busy_cycles(struct adreno_device *adreno_dev)
@@ -2768,6 +2768,7 @@ struct adreno_gpudev adreno_a3xx_gpudev = {
 	.rb_init = a3xx_rb_init,
 	.irq_control = a3xx_irq_control,
 	.irq_handler = a3xx_irq_handler,
+	.irq_pending = a3xx_irq_pending,
 	.busy_cycles = a3xx_busy_cycles,
 	.start = a3xx_start,
 	.snapshot = a3xx_snapshot,

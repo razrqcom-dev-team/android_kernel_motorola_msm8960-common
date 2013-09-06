@@ -1,4 +1,4 @@
-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
  * Copyright (c) 2011, Motorola Mobility, Inc.
  *
  * Redistribution and use in source and binary forms, with or without

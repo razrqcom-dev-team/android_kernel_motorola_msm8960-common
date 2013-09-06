@@ -2,7 +2,7 @@
  *
  * evrc audio input device
  *
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This code is based in part on arch/arm/mach-msm/qdsp5v2/audio_evrc_in.c,
  * Copyright (C) 2008 Google, Inc.
@@ -33,7 +33,7 @@
 
 
 #include <linux/memory_alloc.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 
 #include <asm/atomic.h>
 #include <asm/ioctls.h>

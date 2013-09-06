@@ -18,7 +18,7 @@
 #include <linux/ion.h>
 #include <linux/gpio.h>
 #include <asm/clkdev.h>
-#include <linux/msm_kgsl.h>
+#include <mach/kgsl.h>
 #include <linux/android_pmem.h>
 #include <mach/irqs-8960.h>
 #include <mach/dma.h>
@@ -1628,6 +1628,16 @@ struct platform_device msm_cpudai0 = {
 struct platform_device msm_cpudai1 = {
 	.name	= "msm-dai-q6",
 	.id	= 0x4001,
+};
+
+struct platform_device msm8960_cpudai_slimbus_2_rx = {
+	.name = "msm-dai-q6",
+	.id = 0x4004,
+};
+
+struct platform_device msm8960_cpudai_slimbus_2_tx = {
+	.name = "msm-dai-q6",
+	.id = 0x4005,
 };
 
 struct platform_device msm_cpudai_hdmi_rx = {

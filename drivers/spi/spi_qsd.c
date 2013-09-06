@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,7 +37,7 @@
 #include <linux/mutex.h>
 #include <linux/gpio.h>
 #include <linux/remote_spinlock.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 
 #define SPI_DRV_NAME                  "spi_qsd"
 #if defined(CONFIG_SPI_QSD) || defined(CONFIG_SPI_QSD_MODULE)
@@ -209,7 +209,7 @@ MODULE_LICENSE("GPL v2");
 MODULE_VERSION("0.3");
 MODULE_ALIAS("platform:"SPI_DRV_NAME);
 
-static struct pm_qos_request_list qos_req_list;
+static struct pm_qos_request qos_req_list;
 
 #ifdef CONFIG_DEBUG_FS
 /* Used to create debugfs entries */

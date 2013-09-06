@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,6 +38,46 @@ struct msm_dai_q6_hdmi_dai_data {
 	union afe_port_config port_config;
 };
 
+static int msm_dai_q6_hdmi_format_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+
+	struct msm_dai_q6_hdmi_dai_data *dai_data = kcontrol->private_data;
+	int value = ucontrol->value.integer.value[0];
+	dai_data->port_config.hdmi_multi_ch.data_type = value;
+	pr_debug("%s: value = %d\n", __func__, value);
+	return 0;
+}
+
+static int msm_dai_q6_hdmi_format_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+
+	struct msm_dai_q6_hdmi_dai_data *dai_data = kcontrol->private_data;
+	ucontrol->value.integer.value[0] =
+		dai_data->port_config.hdmi_multi_ch.data_type;
+	return 0;
+}
+
+
+/* HDMI format field for AFE_PORT_MULTI_CHAN_HDMI_AUDIO_IF_CONFIG command
+ *  0: linear PCM
+ *  1: non-linear PCM
+ */
+static const char *hdmi_format[] = {
+	"LPCM",
+	"Compr"
+};
+
+static const struct soc_enum hdmi_config_enum[] = {
+	SOC_ENUM_SINGLE_EXT(2, hdmi_format),
+};
+
+static const struct snd_kcontrol_new hdmi_config_controls[] = {
+	SOC_ENUM_EXT("HDMI RX Format", hdmi_config_enum[0],
+				 msm_dai_q6_hdmi_format_get,
+				 msm_dai_q6_hdmi_format_put),
+};
 
 /* Current implementation assumes hw_param is called once
  * This may not be the case but what to do when ADM and AFE
@@ -51,11 +91,24 @@ static int msm_dai_q6_hdmi_hw_params(struct snd_pcm_substream *substream,
 	u32 channel_allocation = 0;
 	u32 level_shift  = 0; /* 0dB */
 	bool down_mix = FALSE;
+	int sample_rate = 48000;
 
 	dai_data->channels = params_channels(params);
 	dai_data->rate = params_rate(params);
-	dai_data->port_config.hdmi_multi_ch.data_type = 0;
 	dai_data->port_config.hdmi_multi_ch.reserved = 0;
+
+	switch (dai_data->rate) {
+	case 48000:
+		sample_rate = HDMI_SAMPLE_RATE_48KHZ;
+		break;
+	case 44100:
+		sample_rate = HDMI_SAMPLE_RATE_44_1KHZ;
+		break;
+	case 32000:
+		sample_rate = HDMI_SAMPLE_RATE_32KHZ;
+		break;
+	}
+	hdmi_msm_audio_sample_rate_reset(sample_rate);
 
 	switch (dai_data->channels) {
 	case 2:
@@ -85,9 +138,11 @@ static int msm_dai_q6_hdmi_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 	dev_dbg(dai->dev, "%s() num_ch = %u rate =%u"
-		" channel_allocation = %u\n", __func__, dai_data->channels,
+		" channel_allocation = %u data type = %d\n", __func__,
+		dai_data->channels,
 		dai_data->rate,
-		dai_data->port_config.hdmi_multi_ch.channel_allocation);
+		dai_data->port_config.hdmi_multi_ch.channel_allocation,
+		dai_data->port_config.hdmi_multi_ch.data_type);
 
 	return 0;
 }
@@ -140,6 +195,7 @@ static int msm_dai_q6_hdmi_prepare(struct snd_pcm_substream *substream,
 static int msm_dai_q6_hdmi_dai_probe(struct snd_soc_dai *dai)
 {
 	struct msm_dai_q6_hdmi_dai_data *dai_data;
+	const struct snd_kcontrol_new *kcontrol;
 	int rc = 0;
 
 	dai_data = kzalloc(sizeof(struct msm_dai_q6_hdmi_dai_data),
@@ -152,6 +208,10 @@ static int msm_dai_q6_hdmi_dai_probe(struct snd_soc_dai *dai)
 	} else
 		dev_set_drvdata(dai->dev, dai_data);
 
+	kcontrol = &hdmi_config_controls[0];
+
+	rc = snd_ctl_add(dai->card->snd_card,
+					 snd_ctl_new1(kcontrol, dai_data));
 	return rc;
 }
 

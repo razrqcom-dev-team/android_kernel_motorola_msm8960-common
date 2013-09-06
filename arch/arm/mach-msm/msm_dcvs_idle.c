@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,7 +16,7 @@
 #include <linux/module.h>
 #include <linux/cpu_pm.h>
 #include <linux/platform_device.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <linux/hrtimer.h>
 #include <linux/tick.h>
 #include <mach/msm_dcvs.h>
@@ -31,7 +31,7 @@ struct cpu_idle_info {
 static DEFINE_PER_CPU_SHARED_ALIGNED(struct cpu_idle_info, cpu_idle_info);
 static DEFINE_PER_CPU_SHARED_ALIGNED(u64, iowait_on_cpu);
 static char core_name[NR_CPUS][10];
-static struct pm_qos_request_list qos_req;
+static struct pm_qos_request qos_req;
 static uint32_t latency;
 
 static int msm_dcvs_idle_notifier(struct msm_dcvs_idle *self,

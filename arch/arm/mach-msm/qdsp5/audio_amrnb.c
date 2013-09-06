@@ -2,7 +2,7 @@
  *
  * amrnb audio decoder device
  *
- * Copyright (c) 2008-2009, 2011-2012 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2009, 2011-2012 The Linux Foundation. All rights reserved.
  *
  * Based on the mp3 native driver in arch/arm/mach-msm/qdsp5/audio_mp3.c
  *
@@ -42,7 +42,7 @@
 #include <linux/slab.h>
 #include <linux/msm_audio.h>
 #include <linux/memory_alloc.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 
 #include <mach/msm_adsp.h>
 #include <mach/iommu.h>

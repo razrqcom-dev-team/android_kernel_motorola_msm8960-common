@@ -67,8 +67,6 @@ struct snd_compr_params {
 struct snd_compr_tstamp {
 	__u32 byte_offset;
 	__u32 copied_total;
-	__u32 decoded;
-	__u32 rendered;
 	snd_pcm_uframes_t pcm_frames;
 	snd_pcm_uframes_t pcm_io_frames;
 	__u32 sampling_rate;

@@ -2,7 +2,7 @@
  *
  * amrnb encoder device
  *
- * Copyright (c) 2009, 2011-2012 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009, 2011-2012 The Linux Foundation. All rights reserved.
  *
  * This code is based in part on arch/arm/mach-msm/qdsp5/audio_in.c, which is
  * Copyright (C) 2008 Google, Inc.
@@ -37,7 +37,7 @@
 #include <linux/delay.h>
 #include <linux/msm_audio_amrnb.h>
 #include <linux/memory_alloc.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 
 #include "audmgr.h"
 

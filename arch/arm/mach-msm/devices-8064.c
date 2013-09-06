@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -388,6 +388,26 @@ struct platform_device apq_cpudai_slimbus_1_rx = {
 struct platform_device apq_cpudai_slimbus_1_tx = {
 	.name = "msm-dai-q6",
 	.id = 0x4003,
+};
+
+struct platform_device apq_cpudai_slimbus_2_rx = {
+	.name = "msm-dai-q6",
+	.id = 0x4004,
+};
+
+struct platform_device apq_cpudai_slimbus_2_tx = {
+	.name = "msm-dai-q6",
+	.id = 0x4005,
+};
+
+struct platform_device apq_cpudai_slimbus_3_rx = {
+	.name = "msm-dai-q6",
+	.id = 0x4006,
+};
+
+struct platform_device apq_cpudai_slimbus_3_tx = {
+	.name = "msm-dai-q6",
+	.id = 0x4007,
 };
 
 static struct resource resources_ssbi_pmic1[] = {

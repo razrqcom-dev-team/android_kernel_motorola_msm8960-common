@@ -20,6 +20,7 @@ ifeq ($(CONFIG_SYSFS),y)
 obj-$(CONFIG_MODULES)	+= module.o
 endif
 obj-$(CONFIG_SYS_HYPERVISOR) += hypervisor.o
+obj-$(CONFIG_REGMAP)  += regmap/
 
 obj-y	+= sync.o
 obj-y	+= sw_sync.o

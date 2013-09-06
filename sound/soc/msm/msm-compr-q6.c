@@ -951,19 +951,19 @@ static int msm_compr_hw_params(struct snd_pcm_substream *substream,
 				substream->stream);
 			ret = compressed_set_volume(0);
 			if (ret < 0)
-					pr_err("%s : Set Volume failed : %d",
-							__func__, ret);
+				pr_err("%s : Set Volume failed : %d",
+					__func__, ret);
 
 			ret = q6asm_set_softpause(prtd->audio_client,
-							&softpause);
+					&softpause);
 			if (ret < 0)
-					pr_err("%s: Send SoftPause Param failed ret=%d\n",
-							__func__, ret);
+				pr_err("%s: Send SoftPause Param failed ret=%d\n",
+					__func__, ret);
 			ret = q6asm_set_softvolume(prtd->audio_client,
-							&softvol);
+					&softvol);
 			if (ret < 0)
-					pr_err("%s: Send SoftVolume Param failed ret=%d\n",
-							__func__, ret);
+				pr_err("%s: Send SoftVolume Param failed ret=%d\n",
+					__func__, ret);
 			break;
 		}
 	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
@@ -1162,11 +1162,11 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 			rc = q6asm_cmd(prtd->audio_client, CMD_FLUSH);
 			if (rc < 0) {
 				pr_err("%s: flush cmd failed rc=%d\n",
-						__func__, rc);
+					__func__, rc);
 				return rc;
 			}
 			rc = wait_event_timeout(the_locks.flush_wait,
-					prtd->cmd_ack, 5 * HZ);
+				prtd->cmd_ack, 5 * HZ);
 			if (!rc)
 				pr_err("Flush cmd timeout\n");
 			prtd->pcm_irq_pos = 0;

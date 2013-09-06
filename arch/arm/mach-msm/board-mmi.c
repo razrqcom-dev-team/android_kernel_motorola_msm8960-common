@@ -27,7 +27,7 @@
 #include <linux/spi/spi.h>
 #include <linux/slimbus/slimbus.h>
 #include <linux/bootmem.h>
-#include <linux/msm_kgsl.h>
+#include <mach/kgsl.h>
 #include <linux/mmc/msm_sdcc_raw.h>
 #ifdef CONFIG_ANDROID_PMEM
 #include <linux/android_pmem.h>
@@ -2567,6 +2567,8 @@ static struct platform_device *mmi_devices[] __initdata = {
 	&msm_pcm_routing,
 	&msm_cpudai0,
 	&msm_cpudai1,
+	&msm8960_cpudai_slimbus_2_rx,
+	&msm8960_cpudai_slimbus_2_tx,
 	&msm_cpudai_hdmi_rx,
 	&msm_cpudai_bt_rx,
 	&msm_cpudai_bt_tx,

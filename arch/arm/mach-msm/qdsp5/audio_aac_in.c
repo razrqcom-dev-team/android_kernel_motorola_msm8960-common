@@ -2,7 +2,7 @@
  *
  * aac audio input device
  *
- * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This code is based in part on arch/arm/mach-msm/qdsp5v2/audio_aac_in.c,
  * Copyright (C) 2008 Google, Inc.
@@ -33,7 +33,7 @@
 #include <linux/delay.h>
 #include <linux/msm_audio_aac.h>
 #include <linux/memory_alloc.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 
 #include "audmgr.h"
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -29,6 +29,13 @@
 #define TABLA_IS_1_X(ver) \
 	(((ver == TABLA_VERSION_1_0) || (ver == TABLA_VERSION_1_1)) ? 1 : 0)
 #define TABLA_IS_2_0(ver) ((ver == TABLA_VERSION_2_0) ? 1 : 0)
+
+#define SITAR_VERSION_1P0 0
+#define SITAR_VERSION_1P1 1
+#define SITAR_IS_1P0(ver) \
+	((ver == SITAR_VERSION_1P0) ? 1 : 0)
+#define SITAR_IS_1P1(ver) \
+	((ver == SITAR_VERSION_1P1) ? 1 : 0)
 
 enum {
 	TABLA_IRQ_SLIMBUS = 0,
@@ -96,6 +103,7 @@ struct wcd9xxx {
 	struct mutex io_lock;
 	struct mutex xfer_lock;
 	struct mutex irq_lock;
+	struct mutex nested_irq_lock;
 	u8 version;
 
 	unsigned int irq_base;
@@ -111,6 +119,7 @@ struct wcd9xxx {
 	int (*write_dev)(struct wcd9xxx *wcd9xxx, unsigned short reg,
 			 int bytes, void *src, bool interface_reg);
 
+	u32 num_of_supplies;
 	struct regulator_bulk_data *supplies;
 
 	enum wcd9xxx_pm_state pm_state;
@@ -122,6 +131,8 @@ struct wcd9xxx {
 
 	int num_rx_port;
 	int num_tx_port;
+
+	u8 idbyte[4];
 };
 
 int wcd9xxx_reg_read(struct wcd9xxx *wcd9xxx, unsigned short reg);
@@ -141,6 +152,8 @@ int wcd9xxx_get_intf_type(void);
 
 bool wcd9xxx_lock_sleep(struct wcd9xxx *wcd9xxx);
 void wcd9xxx_unlock_sleep(struct wcd9xxx *wcd9xxx);
+void wcd9xxx_nested_irq_lock(struct wcd9xxx *wcd9xxx);
+void wcd9xxx_nested_irq_unlock(struct wcd9xxx *wcd9xxx);
 enum wcd9xxx_pm_state wcd9xxx_pm_cmpxchg(struct wcd9xxx *wcd9xxx,
 				enum wcd9xxx_pm_state o,
 				enum wcd9xxx_pm_state n);

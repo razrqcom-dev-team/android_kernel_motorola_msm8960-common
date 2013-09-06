@@ -1,6 +1,6 @@
 /* audio_wma.c - wma audio decoder driver
  *
- * Copyright (c) 2009, 2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009, 2011, The Linux Foundation. All rights reserved.
  *
  * Based on the mp3 native driver in arch/arm/mach-msm/qdsp5/audio_mp3.c
  *
@@ -41,7 +41,7 @@
 #include <linux/msm_audio.h>
 #include <linux/msm_audio_wma.h>
 #include <linux/memory_alloc.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 
 #include <mach/msm_adsp.h>
 #include <mach/iommu.h>

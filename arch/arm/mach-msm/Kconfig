@@ -253,7 +253,7 @@ config ARCH_MSMCOPPER
 	select MSM_GPIOMUX
 	select MULTI_IRQ_HANDLER
 	select MSM_MULTIMEDIA_USE_ION
-	select MSM_QDSP6_APR
+	select MSM_QDSP6_APRV2
 	select MSM_QDSP6V2_CODECS
 	select MSM_AUDIO_QDSP6V2 if SND_SOC
 
@@ -703,6 +703,12 @@ config MACH_MSM8960_MMI
 	select OF_FLATTREE_HOST_BYTEORDER
 	help
 	  Support for Motorola Mobility MSM8960 devices.
+
+config MACH_MSM8960_MMI_SOLSTICE
+	depends on MACH_MSM8960_MMI
+	bool "XT901/Solistice Support"
+	help
+	  Support for Motorola Mobility Solstice device.
 
 config MMI_ENABLE_RTC
 	depends on MACH_MSM8960_MMI
@@ -2026,6 +2032,16 @@ config MSM_QDSP6_APR
 	default n
 	help
 	  Enable APR IPC protocol support between
+	  application processor and QDSP6. APR is
+	  used by audio driver to configure QDSP6's
+	  ASM, ADM and AFE.
+
+config MSM_QDSP6_APRV2
+	bool "Audio QDSP6 APRv2 support"
+	depends on MSM_SMD
+	default n
+	help
+	  Enable APRv2 IPC protocol support between
 	  application processor and QDSP6. APR is
 	  used by audio driver to configure QDSP6's
 	  ASM, ADM and AFE.

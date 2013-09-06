@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 and
@@ -322,8 +322,8 @@ static int msm_afe_open(struct snd_pcm_substream *substream)
 				(app_cb)q6asm_event_handler, prtd);
 	if (!prtd->audio_client) {
 		pr_debug("%s: Could not allocate memory\n", __func__);
-		kfree(prtd);
 		mutex_unlock(&prtd->lock);
+		kfree(prtd);
 		return -ENOMEM;
 	}
 	hrtimer_init(&prtd->hrt, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
@@ -495,8 +495,7 @@ static int msm_afe_hw_params(struct snd_pcm_substream *substream,
 			runtime->hw.period_bytes_min,
 			runtime->hw.periods_max);
 	if (ret < 0) {
-		pr_err("Audio Start: Buffer Allocation failed \
-					rc = %d\n", ret);
+		pr_err("Audio Start: Buffer Allocation failed rc = %d\n", ret);
 		mutex_unlock(&prtd->lock);
 		return -ENOMEM;
 	}

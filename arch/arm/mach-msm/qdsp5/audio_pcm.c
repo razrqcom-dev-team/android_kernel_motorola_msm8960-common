@@ -1,7 +1,7 @@
 
 /* audio_pcm.c - pcm audio decoder driver
  *
- * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  *
  * Based on the mp3 decoder driver in arch/arm/mach-msm/qdsp5/audio_mp3.c
  *
@@ -38,7 +38,7 @@
 #include <linux/delay.h>
 #include <linux/earlysuspend.h>
 #include <linux/list.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 #include <linux/slab.h>
 #include <linux/msm_audio.h>
 

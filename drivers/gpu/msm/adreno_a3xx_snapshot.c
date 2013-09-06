@@ -1,4 +1,4 @@
-/* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -265,6 +265,7 @@ void *a3xx_snapshot(struct adreno_device *adreno_dev, void *snapshot,
 	int *remain, int hang)
 {
 	struct kgsl_device *device = &adreno_dev->dev;
+	struct kgsl_snapshot_registers_list list;
 	struct kgsl_snapshot_registers regs;
 
 	regs.regs = (unsigned int *) a3xx_registers;
@@ -273,10 +274,16 @@ void *a3xx_snapshot(struct adreno_device *adreno_dev, void *snapshot,
 	/* Disable Clock gating temporarily for the debug bus to work */
 	adreno_regwrite(device, A3XX_RBBM_CLOCK_CTL, 0x00);
 
+	list.registers = &regs;
+	list.count = 1;
+
+	/* Disable Clock gating temporarily for the debug bus to work */
+	adreno_regwrite(device, A3XX_RBBM_CLOCK_CTL, 0x00);
+
 	/* Master set of (non debug) registers */
 	snapshot = kgsl_snapshot_add_section(device,
 		KGSL_SNAPSHOT_SECTION_REGS, snapshot, remain,
-		kgsl_snapshot_dump_regs, &regs);
+		kgsl_snapshot_dump_regs, &list);
 
 	/* CP_STATE_DEBUG indexed registers */
 	snapshot = kgsl_snapshot_indexed_registers(device, snapshot,

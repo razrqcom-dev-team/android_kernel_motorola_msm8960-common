@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1667,10 +1667,16 @@ static void reconnect_to_bam(void)
 	if (polling_mode)
 		rx_switch_to_interrupt_mode();
 
+#ifdef CONFIG_MACH_MSM8960_MMI_SOLSTICE
+	toggle_apps_ack();
+	complete_all(&bam_connection_completion);
+	queue_rx();
+#else
 	queue_rx();
 
 	toggle_apps_ack();
 	complete_all(&bam_connection_completion);
+#endif
 }
 
 static void disconnect_to_bam(void)
@@ -1993,10 +1999,17 @@ static int bam_init(void)
 	}
 
 	bam_mux_initialized = 1;
+#ifdef CONFIG_MACH_MSM8960_MMI_SOLSTICE
+	toggle_apps_ack();
+	bam_connection_is_active = 1;
+	complete_all(&bam_connection_completion);
+	queue_rx();
+#else
 	queue_rx();
 	toggle_apps_ack();
 	bam_connection_is_active = 1;
 	complete_all(&bam_connection_completion);
+#endif
 	return 0;
 
 rx_event_reg_failed:

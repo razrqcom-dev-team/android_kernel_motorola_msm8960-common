@@ -15,7 +15,7 @@
 #include <mach/qdsp6v2/apr.h>
 #include <sound/apr_audio.h>
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 #endif
 
 #define IN                      0x000
@@ -83,18 +83,18 @@
 
 #define SESSION_MAX	0x08
 
-#define SOFT_PAUSE_PERIOD       30   /* ramp up/down for 30ms    */
+#define SOFT_PAUSE_PERIOD       30   /* ramp up/down for 30ms */
 #define SOFT_PAUSE_STEP_LINEAR  0    /* Step value 0ms or 0us */
-#define SOFT_PAUSE_STEP         2000 /* Step value 2000ms or 2000us */
+#define SOFT_PAUSE_STEP         0    /* Step value 0ms or 0us */
 enum {
 	SOFT_PAUSE_CURVE_LINEAR = 0,
 	SOFT_PAUSE_CURVE_EXP,
 	SOFT_PAUSE_CURVE_LOG,
 };
 
-#define SOFT_VOLUME_PERIOD       30   /* ramp up/down for 30ms    */
+#define SOFT_VOLUME_PERIOD       30   /* ramp up/down for 30ms */
 #define SOFT_VOLUME_STEP_LINEAR  0    /* Step value 0ms or 0us */
-#define SOFT_VOLUME_STEP         2000 /* Step value 2000ms or 2000us */
+#define SOFT_VOLUME_STEP         0    /* Step value 0ms or 0us */
 enum {
 	SOFT_VOLUME_CURVE_LINEAR = 0,
 	SOFT_VOLUME_CURVE_EXP,
@@ -198,6 +198,8 @@ int q6asm_open_write_compressed(struct audio_client *ac, uint32_t format);
 int q6asm_open_read_write(struct audio_client *ac,
 			uint32_t rd_format,
 			uint32_t wr_format);
+
+int q6asm_open_loopack(struct audio_client *ac);
 
 int q6asm_write(struct audio_client *ac, uint32_t len, uint32_t msw_ts,
 				uint32_t lsw_ts, uint32_t flags);

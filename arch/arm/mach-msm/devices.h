@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-msm/devices.h
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -166,6 +166,8 @@ extern struct platform_device msm_lowlatency_pcm;
 extern struct platform_device msm_pcm_routing;
 extern struct platform_device msm_cpudai0;
 extern struct platform_device msm_cpudai1;
+extern struct platform_device msm8960_cpudai_slimbus_2_rx;
+extern struct platform_device msm8960_cpudai_slimbus_2_tx;
 extern struct platform_device msm_cpudai_hdmi_rx;
 extern struct platform_device msm_cpudai_bt_rx;
 extern struct platform_device msm_cpudai_bt_tx;
@@ -223,6 +225,10 @@ extern struct platform_device apq_pcm_afe;
 extern struct platform_device apq_cpudai_stub;
 extern struct platform_device apq_cpudai_slimbus_1_rx;
 extern struct platform_device apq_cpudai_slimbus_1_tx;
+extern struct platform_device apq_cpudai_slimbus_2_rx;
+extern struct platform_device apq_cpudai_slimbus_2_tx;
+extern struct platform_device apq_cpudai_slimbus_3_rx;
+extern struct platform_device apq_cpudai_slimbus_3_tx;
 extern struct platform_device apq_cpudai_slim_4_rx;
 extern struct platform_device apq_cpudai_slim_4_tx;
 

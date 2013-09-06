@@ -1,7 +1,7 @@
 /* linux/include/mach/hsusb.h
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -19,7 +19,7 @@
 #define __ASM_ARCH_MSM_HSUSB_H
 
 #include <linux/types.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 
 #define PHY_TYPE_MASK		0x0F
 #define PHY_TYPE_MODE		0xF0
@@ -173,7 +173,7 @@ struct msm_otg_platform_data {
 	int (*config_vddcx)(int high);
 	int (*init_vddcx)(int init);
 
-	struct pm_qos_request_list pm_qos_req_dma;
+	struct pm_qos_request pm_qos_req_dma;
 };
 
 struct msm_usb_host_platform_data {

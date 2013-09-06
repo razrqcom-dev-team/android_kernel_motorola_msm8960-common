@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/clock.c
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2007-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2007-2011, The Linux Foundation. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -17,6 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/err.h>
 #include <linux/spinlock.h>
+#include <linux/pm_qos.h>
 #include <linux/string.h>
 #include <linux/module.h>
 #include <linux/clk.h>

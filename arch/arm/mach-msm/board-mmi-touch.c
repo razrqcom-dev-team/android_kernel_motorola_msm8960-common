@@ -32,7 +32,7 @@
 #include <linux/spi/spi.h>
 #include <linux/slimbus/slimbus.h>
 #include <linux/bootmem.h>
-#include <linux/msm_kgsl.h>
+#include <mach/kgsl.h>
 #include <linux/mmc/msm_sdcc_raw.h>
 #include <linux/of_fdt.h>
 #include <linux/of.h>

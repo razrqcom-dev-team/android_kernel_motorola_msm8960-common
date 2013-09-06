@@ -2,7 +2,7 @@
  *
  * qcelp 13k audio decoder device
  *
- * Copyright (c) 2008-2009, 2011-2012 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2009, 2011-2012 The Linux Foundation. All rights reserved.
  *
  * This code is based in part on audio_mp3.c, which is
  * Copyright (C) 2008 Google, Inc.
@@ -37,7 +37,7 @@
 #include <linux/slab.h>
 #include <linux/msm_audio.h>
 #include <linux/memory_alloc.h>
-#include <linux/ion.h>
+#include <linux/msm_ion.h>
 
 #include <mach/msm_adsp.h>
 #include <mach/iommu.h>

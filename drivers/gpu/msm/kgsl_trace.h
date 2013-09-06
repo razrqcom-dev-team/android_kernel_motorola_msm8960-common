@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -506,10 +506,45 @@ TRACE_EVENT(kgsl_mmu_pagefault,
 	),
 
 	TP_printk(
-		"d_name=%s page=0x%08x pt=%d op=%s\n",
+		"d_name=%s page=0x%08x pt=%d op=%s",
 		__get_str(device_name), __entry->page, __entry->pt,
 		__get_str(op)
 	)
+);
+
+TRACE_EVENT(kgsl_register_event,
+		TP_PROTO(unsigned int id, unsigned int timestamp),
+		TP_ARGS(id, timestamp),
+		TP_STRUCT__entry(
+			__field(unsigned int, id)
+			__field(unsigned int, timestamp)
+		),
+		TP_fast_assign(
+			__entry->id = id;
+			__entry->timestamp = timestamp;
+		),
+		TP_printk(
+			"ctx=%d ts=%d",
+			__entry->id, __entry->timestamp)
+);
+
+TRACE_EVENT(kgsl_fire_event,
+		TP_PROTO(unsigned int id, unsigned int ts,
+			unsigned int age),
+		TP_ARGS(id, ts, age),
+		TP_STRUCT__entry(
+			__field(unsigned int, id)
+			__field(unsigned int, ts)
+			__field(unsigned int, age)
+		),
+		TP_fast_assign(
+			__entry->id = id;
+			__entry->ts = ts;
+			__entry->age = age;
+		),
+		TP_printk(
+			"ctx=%d ts=%d age=%u",
+			__entry->id, __entry->ts, __entry->age)
 );
 
 #endif /* _KGSL_TRACE_H */
