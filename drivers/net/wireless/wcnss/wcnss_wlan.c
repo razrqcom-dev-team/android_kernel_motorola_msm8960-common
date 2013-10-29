@@ -116,7 +116,6 @@ static ssize_t wcnss_thermal_mitigation_store(struct device *dev,
 
 static DEVICE_ATTR(thermal_mitigation, S_IRUSR | S_IWUSR,
 	wcnss_thermal_mitigation_show, wcnss_thermal_mitigation_store);
->>>>>>> 5fda4f8... wcnss: add sysfs entry to support Thermal Mitigation
 
 static int wcnss_create_sysfs(struct device *dev)
 {
