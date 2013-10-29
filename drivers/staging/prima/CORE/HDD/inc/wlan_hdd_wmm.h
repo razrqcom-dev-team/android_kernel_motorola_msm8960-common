@@ -1,24 +1,23 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- */
-
+  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+  *
+  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+  *
+  *
+  * Permission to use, copy, modify, and/or distribute this software for
+  * any purpose with or without fee is hereby granted, provided that the
+  * above copyright notice and this permission notice appear in all
+  * copies.
+  *
+  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+  * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+  * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+  * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+  * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+  * PERFORMANCE OF THIS SOFTWARE.
+*/
 #ifndef _WLAN_HDD_WMM_H
 #define _WLAN_HDD_WMM_H
 /*============================================================================
@@ -43,9 +42,9 @@
   The remaining functions are utility functions for information hiding.
 
 
-               Copyright (c) 2008-9 QUALCOMM Incorporated.
+               Copyright (c) 2008-9 Qualcomm Technologies, Inc.
                All Rights Reserved.
-               Qualcomm Confidential and Proprietary
+               Qualcomm Technologies Confidential and Proprietary
 ============================================================================*/
 /* $Header$ */
 
@@ -84,7 +83,7 @@ typedef enum
    HDD_LINUX_AC_BK = 3
 
 } hdd_wmm_linuxac_t;
-
+ 
 /*! @brief types of classification supported
 */
 typedef enum
@@ -118,6 +117,12 @@ typedef enum
 
 } hdd_wmm_user_mode_t;
 
+// UAPSD Mask bits
+// (Bit0:VO; Bit1:VI; Bit2:BK; Bit3:BE all other bits are ignored)
+#define HDD_AC_VO 0x1
+#define HDD_AC_VI 0x2
+#define HDD_AC_BK 0x4
+#define HDD_AC_BE 0x8
 
 /*! @brief WMM Qos instance control block
 */
@@ -167,9 +172,18 @@ typedef struct
    sme_QosWmmTspecInfo          wmmAcTspecInfo;
 
    // current U-APSD parameters
+   v_BOOL_t                     wmmAcIsUapsdEnabled;
    v_U32_t                      wmmAcUapsdServiceInterval;
    v_U32_t                      wmmAcUapsdSuspensionInterval;
    sme_QosWmmDirType            wmmAcUapsdDirection;
+
+#ifdef FEATURE_WLAN_CCX
+   // Inactivity time parameters for TSPEC
+   v_U32_t                      wmmInactivityTime;
+   v_U32_t                      wmmPrevTrafficCnt;
+   vos_timer_t                  wmmInactivityTimer;
+#endif
+
 } hdd_wmm_ac_status_t;
 
 /*! @brief WMM state & status info
@@ -374,5 +388,14 @@ hdd_wlan_wmm_status_e hdd_wmm_delts( hdd_adapter_t* pAdapter,
   ===========================================================================*/
 hdd_wlan_wmm_status_e hdd_wmm_checkts( hdd_adapter_t* pAdapter,
                                        v_U32_t handle );
+/**============================================================================
+  @brief hdd_wmm_adapter_clear() - Function which will clear the WMM status
+  of all ACs
+  @param pAdapter  : [in]  pointer to adapter context
+
+  @return          : VOS_STATUS_SUCCESS if succssful
+                   : other values if failure
+  ===========================================================================*/
+VOS_STATUS hdd_wmm_adapter_clear( hdd_adapter_t *pAdapter );
 
 #endif /* #ifndef _WLAN_HDD_WMM_H */

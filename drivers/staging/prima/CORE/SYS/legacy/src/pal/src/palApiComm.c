@@ -18,6 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 #include <palApi.h>
 #include <sirTypes.h>   // needed for tSirRetStatus
@@ -26,14 +46,7 @@
 #include <sirParams.h>  // needed for tSirMbMsg
 #include "wlan_qct_wda.h"
 
-
-// its not worth the time trying to get all the includes in place to get to
-// halMmhForwardMBmsg.  if I inlude halMnt.h, I get all kids of compile errros
-// for things missing from palPipes.h (asicDxe.h is looking for these).  palPipes
-// is used only in Gen4 DVT code so why we would have it or need it is puzzling.
-//#include <halMnt.h>
-
-
+#ifndef FEATURE_WLAN_PAL_MEM_DISABLE
 
 #ifdef MEMORY_DEBUG
 eHalStatus palAllocateMemory_debug( tHddHandle hHdd, void **ppMemory, tANI_U32 numBytes, char* fileName, tANI_U32 lineNum )
@@ -94,7 +107,7 @@ tANI_BOOLEAN palEqualMemory( tHddHandle hHdd, void *pMemory1, void *pMemory2, tA
 {
    return( vos_mem_compare( pMemory1, pMemory2, numBytes ) );
 }   
-
+#endif
 
 eHalStatus palPktAlloc(tHddHandle hHdd, eFrameType frmType, tANI_U16 size, void **data, void **ppPacket)
 {
@@ -293,7 +306,7 @@ eHalStatus palSendMBMessage(tHddHandle hHdd, void *pBuf)
    if (NULL == vosContext)
    {
       VOS_TRACE(VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR,
-                "%s: invalid vosContext", __FUNCTION__);
+                "%s: invalid vosContext", __func__);
    }
    else
    {
@@ -301,7 +314,7 @@ eHalStatus palSendMBMessage(tHddHandle hHdd, void *pBuf)
       if (NULL == hHal)
       {
          VOS_TRACE(VOS_MODULE_ID_SYS, VOS_TRACE_LEVEL_ERROR,
-                   "%s: invalid hHal", __FUNCTION__);
+                   "%s: invalid hHal", __func__);
       }
       else
       {
@@ -313,7 +326,7 @@ eHalStatus palSendMBMessage(tHddHandle hHdd, void *pBuf)
       }
    }
 
-   palFreeMemory( hHdd, pBuf );
+   vos_mem_free( pBuf );
 
    return( halStatus );
 }

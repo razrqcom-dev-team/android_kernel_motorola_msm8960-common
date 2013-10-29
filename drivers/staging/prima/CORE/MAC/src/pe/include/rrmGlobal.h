@@ -18,6 +18,29 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/*
+ * */
 
 #if !defined( __RRMGLOBAL_H )
 #define __RRMGLOBAL_H
@@ -33,6 +56,9 @@
    Qualcomm Confidential and Proprietary.
 
   ========================================================================*/
+
+#define SIR_BCN_REPORT_MAX_BSS_DESC_PER_ACTION_FRAME    3
+#define SIR_BCN_REPORT_MAX_BSS_PER_CHANNEL             15
 
 typedef enum eRrmRetStatus
 {
@@ -59,7 +85,7 @@ typedef struct sSirBeaconReportReqInd
    tSirMacAddr      macaddrBssid;   //0: wildcard
    tANI_U8      fMeasurementtype;  //0:Passive, 1: Active, 2: table mode
    tAniSSID     ssId;              //May be wilcard.
-   tANI_U8      uDialogToken;
+   tANI_U16      uDialogToken;
    tSirChannelList channelList; //From AP channel report.
 } tSirBeaconReportReqInd, * tpSirBeaconReportReqInd;
 
@@ -69,11 +95,12 @@ typedef struct sSirBeaconReportXmitInd
    tANI_U16    messageType; // eWNI_SME_BEACON_REPORT_RESP_XMIT_IND
    tANI_U16    length;
    tSirMacAddr bssId;
-   tANI_U8     uDialogToken;
+   tANI_U16     uDialogToken;
    tANI_U8     fMeasureDone;
    tANI_U16    duration;
    tANI_U8     regClass;
-   tSirBssDescription bssDescription[1];
+   tANI_U8     numBssDesc;
+   tpSirBssDescription pBssDescription[SIR_BCN_REPORT_MAX_BSS_DESC_PER_ACTION_FRAME];
 } tSirBeaconReportXmitInd, * tpSirBeaconReportXmitInd;
 
 typedef struct sSirNeighborReportReqInd
@@ -91,22 +118,38 @@ typedef struct sSirNeighborBssDescription
 {
    tANI_U16        length;
    tSirMacAddr     bssId;
-   struct sSirNeighborBssidInfo {
-      tANI_U32      fApPreauthReachable:2;  //see IEEE 802.11k Table 7-43a
-      tANI_U32      fSameSecurityMode:1;
-      tANI_U32      fSameAuthenticator:1;
-      tANI_U32      fCapSpectrumMeasurement:1; //see IEEE 802.11k Table 7-95d
-      tANI_U32      fCapQos:1; 
-      tANI_U32      fCapApsd:1; 
-      tANI_U32      fCapRadioMeasurement:1; 
-      tANI_U32      fCapDelayedBlockAck:1; 
-      tANI_U32      fCapImmediateBlockAck:1;
-      tANI_U32      fMobilityDomain:1;
-      tANI_U32      reserved:21; 
-   } bssidInfo;
    tANI_U8         regClass;
    tANI_U8         channel;
    tANI_U8         phyType;
+   union sSirNeighborBssidInfo {
+         struct _rrmInfo {
+                tANI_U32      fApPreauthReachable:2;  //see IEEE 802.11k Table 7-43a
+                tANI_U32      fSameSecurityMode:1;
+                tANI_U32      fSameAuthenticator:1;
+                tANI_U32      fCapSpectrumMeasurement:1; //see IEEE 802.11k Table 7-95d
+                tANI_U32      fCapQos:1; 
+                tANI_U32      fCapApsd:1; 
+                tANI_U32      fCapRadioMeasurement:1; 
+                tANI_U32      fCapDelayedBlockAck:1; 
+                tANI_U32      fCapImmediateBlockAck:1;
+                tANI_U32      fMobilityDomain:1;
+                tANI_U32      reserved:21; 
+         } rrmInfo;
+         struct _ccxInfo {
+                tANI_U32      channelBand:8;
+                tANI_U32      minRecvSigPower:8;
+                tANI_U32      apTxPower:8;
+                tANI_U32      roamHysteresis:8;
+                tANI_U32      adaptScanThres:8;
+
+                tANI_U32      transitionTime:8;
+                tANI_U32      tsfOffset:16;
+
+                tANI_U32      beaconInterval:16;
+                tANI_U32      reserved: 16;
+         } ccxInfo;
+   } bssidInfo;
+ 
    //Optional sub IEs....ignoring for now.
 }tSirNeighborBssDescription, *tpSirNeighborBssDescripton;
 

@@ -18,6 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 #ifndef WLAN_QCT_WLANSAP_H
 #define WLAN_QCT_WLANSAP_H
@@ -71,9 +91,7 @@ when           who                what, where, why
 #include "vos_packet.h" 
 #include "vos_types.h"
 
-#ifdef WLAN_FEATURE_P2P
 #include "p2p_Api.h"
-#endif
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -91,10 +109,9 @@ when           who                what, where, why
 /*--------------------------------------------------------------------------
   defines and enum
   ------------------------------------------------------------------------*/
-  
+
 #define       MAX_SSID_LEN                 32
-#define       MAX_MAC_ADDRESS_ACCEPTED     16
-#define       MAX_MAC_ADDRESS_DENIED       MAX_MAC_ADDRESS_ACCEPTED
+#define       MAX_ACL_MAC_ADDRESS          16
 #define       AUTO_CHANNEL_SELECT          0
 #define       MAX_ASSOC_IND_IE_LEN         255
 
@@ -148,7 +165,10 @@ typedef enum {
     eSAP_DOT11_MODE_11g_ONLY = 0x0080,
     eSAP_DOT11_MODE_11n_ONLY = 0x0100,
     eSAP_DOT11_MODE_11b_ONLY = 0x0400,
-
+#ifdef WLAN_FEATURE_11AC
+    eSAP_DOT11_MODE_11ac     = 0x1000,
+    eSAP_DOT11_MODE_11ac_ONLY = 0x2000
+#endif
 } eSapPhyMode;
 
 typedef enum {
@@ -171,6 +191,7 @@ typedef enum {
 typedef enum {
     eSAP_START_BSS_EVENT = 0, /*Event sent when BSS is started*/
     eSAP_STOP_BSS_EVENT,      /*Event sent when BSS is stopped*/
+    eSAP_STA_ASSOC_IND,       /* Indicate the association request to upper layers */    
     eSAP_STA_ASSOC_EVENT,     /*Event sent when we have successfully associated a station and 
                                 upper layer neeeds to allocate a context*/
     eSAP_STA_REASSOC_EVENT,   /*Event sent when we have successfully reassociated a station and 
@@ -182,11 +203,11 @@ typedef enum {
     eSAP_ASSOC_STA_CALLBACK_EVENT,  /*Event sent when user called WLANSAP_GetAssocStations */
     eSAP_GET_WPSPBC_SESSION_EVENT,  /* Event send when user call  WLANSAP_getWpsSessionOverlap */  
     eSAP_WPS_PBC_PROBE_REQ_EVENT, /* Event send on WPS PBC probe request is received */
-#ifdef WLAN_FEATURE_P2P
     eSAP_INDICATE_MGMT_FRAME,
     eSAP_REMAIN_CHAN_READY,
     eSAP_SEND_ACTION_CNF,
-#endif
+    eSAP_DISCONNECT_ALL_P2P_CLIENT,
+    eSAP_MAC_TRIG_STOP_BSS_EVENT,
     eSAP_UNKNOWN_STA_JOIN, /* Event send when a STA in neither white list or black list tries to associate in softap mode */
     eSAP_MAX_ASSOC_EXCEEDED, /* Event send when a new STA is rejected association since softAP max assoc limit has reached */
 } eSapHddEvent;
@@ -240,6 +261,23 @@ typedef struct sap_StopBssCompleteEvent_s {
     v_U8_t status;
 } tSap_StopBssCompleteEvent;
 
+typedef struct sap_StationAssocIndication_s {
+    v_MACADDR_t  staMac;
+    v_U8_t       assoId;
+    v_U8_t       staId;
+    v_U8_t       status;
+    // Required for indicating the frames to upper layer
+    tANI_U32     beaconLength;
+    tANI_U8*     beaconPtr;
+    tANI_U32     assocReqLength;
+    tANI_U8*     assocReqPtr;
+    tANI_BOOLEAN fWmmEnabled;
+    eCsrAuthType negotiatedAuthType;
+    eCsrEncryptionType negotiatedUCEncryptionType;
+    eCsrEncryptionType negotiatedMCEncryptionType;
+    tANI_BOOLEAN fAuthRequired;
+} tSap_StationAssocIndication;
+
 typedef struct sap_StationAssocReassocCompleteEvent_s {
     v_MACADDR_t  staMac;
     v_U8_t       staId;
@@ -249,6 +287,13 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
     v_U32_t      statusCode; 
     eSapAuthType SapAuthType;
     v_BOOL_t     wmmEnabled;
+    // Required for indicating the frames to upper layer
+    tANI_U32     beaconLength;
+    tANI_U8*     beaconPtr;
+    tANI_U32     assocReqLength;
+    tANI_U8*     assocReqPtr;
+    tANI_U32     assocRespLength;
+    tANI_U8*     assocRespPtr;    
 } tSap_StationAssocReassocCompleteEvent;
 
 typedef struct sap_StationDisassocCompleteEvent_s {
@@ -286,6 +331,11 @@ typedef struct sap_AssocMacAddr_s {
     v_MACADDR_t staMac;     /*MAC address of Station that is associated*/
     v_U8_t      assocId;        /*Association ID for the station that is associated*/
     v_U8_t      staId;            /*Station Id that is allocated to the station*/
+    v_U8_t      ShortGI40Mhz;
+    v_U8_t      ShortGI20Mhz;
+    v_U8_t      Support40Mhz;
+    v_U32_t     requestedMCRate;
+    tSirSupportedRates supportedRates;
 } tSap_AssocMacAddr, *tpSap_AssocMacAddr;
 
 /*struct corresponding to SAP_ASSOC_STA_CALLBACK_EVENT */
@@ -310,11 +360,10 @@ typedef struct sap_WPSPBCProbeReqEvent_s {
     tSirWPSPBCProbeReq WPSPBCProbeReq;
 } tSap_WPSPBCProbeReqEvent; 
 
-#ifdef WLAN_FEATURE_P2P
 typedef struct sap_ManagementFrameInfo_s {
     tANI_U32 nFrameLength;
     tANI_U8  frameType;
-    tANI_U32 rxChan;            //Channel of where packet is recevied 
+    tANI_U32 rxChan;            //Channel of where packet is received 
     tANI_U8 *pbFrames;         //Point to a buffer contain the beacon, assoc req, assoc rsp frame, in that order
                              //user needs to use nBeaconLength, nAssocReqLength, nAssocRspLength to desice where
                             //each frame starts and ends.
@@ -323,7 +372,6 @@ typedef struct sap_ManagementFrameInfo_s {
 typedef struct sap_SendActionCnf_s {
     eSapStatus actionSendSuccess; 
 } tSap_SendActionCnf;
-#endif
 
 typedef struct sap_UnknownSTAJoinEvent_s {
     v_MACADDR_t    macaddr;  
@@ -344,6 +392,7 @@ typedef struct sap_Event_s {
     union {
         tSap_StartBssCompleteEvent                sapStartBssCompleteEvent; /*SAP_START_BSS_EVENT*/
         tSap_StopBssCompleteEvent                 sapStopBssCompleteEvent;  /*SAP_STOP_BSS_EVENT*/
+        tSap_StationAssocIndication               sapAssocIndication;       /*SAP_ASSOC_INDICATION */         
         tSap_StationAssocReassocCompleteEvent     sapStationAssocReassocCompleteEvent; /*SAP_STA_ASSOC_EVENT, SAP_STA_REASSOC_EVENT*/
         tSap_StationDisassocCompleteEvent         sapStationDisassocCompleteEvent;/*SAP_STA_DISASSOC_EVENT*/
         tSap_StationSetKeyCompleteEvent           sapStationSetKeyCompleteEvent;/*SAP_STA_SET_KEY_EVENT*/
@@ -352,10 +401,8 @@ typedef struct sap_Event_s {
         tSap_AssocStaListEvent                    sapAssocStaListEvent; /*SAP_ASSOC_STA_CALLBACK_EVENT */
         tSap_GetWPSPBCSessionEvent                sapGetWPSPBCSessionEvent; /*SAP_GET_WPSPBC_SESSION_EVENT */
         tSap_WPSPBCProbeReqEvent                  sapPBCProbeReqEvent; /*eSAP_WPS_PBC_PROBE_REQ_EVENT */
-#ifdef WLAN_FEATURE_P2P
         tSap_ManagementFrameInfo                  sapManagementFrameInfo; /*eSAP_INDICATE_MGMT_FRAME*/
         tSap_SendActionCnf                        sapActionCnf;  /* eSAP_SEND_ACTION_CNF */ 
-#endif
         tSap_UnknownSTAJoinEvent                  sapUnknownSTAJoin; /* eSAP_UNKNOWN_STA_JOIN */
         tSap_MaxAssocExceededEvent                sapMaxAssocExceeded; /* eSAP_MAX_ASSOC_EXCEEDED */
     } sapevt;
@@ -376,11 +423,11 @@ typedef struct sap_Config {
     tSap_SSIDInfo_t SSIDinfo;
     eSapPhyMode     SapHw_mode; /* Wireless Mode */
     eSapMacAddrACL  SapMacaddr_acl;
-    v_MACADDR_t     accept_mac[MAX_MAC_ADDRESS_ACCEPTED]; /* MAC filtering */
+    v_MACADDR_t     accept_mac[MAX_ACL_MAC_ADDRESS]; /* MAC filtering */
     v_BOOL_t        ieee80211d;      /*Specify if 11D is enabled or disabled*/
     v_BOOL_t        protEnabled;     /*Specify if protection is enabled or disabled*/
     v_BOOL_t        obssProtEnabled; /*Specify if OBSS protection is enabled or disabled*/
-    v_MACADDR_t     deny_mac[MAX_MAC_ADDRESS_DENIED]; /* MAC filtering */
+    v_MACADDR_t     deny_mac[MAX_ACL_MAC_ADDRESS]; /* MAC filtering */
     v_MACADDR_t     self_macaddr; //self macaddress or BSSID
    
     v_U8_t          channel;         /* Operation channel */
@@ -505,6 +552,12 @@ typedef struct sap_WPSIE_s {
     } sapwpsie;
 } tSap_WPSIE, *tpSap_WPSIE;
 
+#ifdef WLANTL_DEBUG
+#define MAX_RATE_INDEX      136
+#define MAX_NUM_RSSI        100
+#define MAX_RSSI_INTERVAL     5
+#endif
+
 typedef struct sap_SoftapStats_s {
    v_U32_t txUCFcnt;
    v_U32_t txMCFcnt;
@@ -521,8 +574,15 @@ typedef struct sap_SoftapStats_s {
    v_U32_t rxBcnt;
    v_U32_t rxBcntCRCok;
    v_U32_t rxRate;
+#ifdef WLANTL_DEBUG
+   v_U32_t pktCounterRateIdx[MAX_RATE_INDEX];
+   v_U32_t pktCounterRssi[MAX_NUM_RSSI];
+#endif
 } tSap_SoftapStats, *tpSap_SoftapStats;
 
+
+int sapSetPreferredChannel(tANI_U8* ptr);
+void sapCleanupChannelList(void);
 
 /*==========================================================================
   FUNCTION    WLANSAP_Set_WpsIe
@@ -848,6 +908,38 @@ WLANSAP_StartBss
     v_PVOID_t  pvosGCtx, 
     tpWLAN_SAPEventCB pSapEventCallback, 
     tsap_Config_t *pConfig, v_PVOID_t  pUsrContext
+);
+
+/*==========================================================================
+  FUNCTION    WLANSAP_SetMacACL
+
+  DESCRIPTION
+  This api function provides SAP to set mac list entry in accept list as well
+  as deny list
+
+  DEPENDENCIES
+    NA.
+
+  PARAMETERS
+
+    IN
+pvosGCtx: Pointer to vos global context structure
+pConfig:  Pointer to configuration structure passed down from
+          HDD(HostApd for Android)
+
+
+  RETURN VALUE
+    The VOS_STATUS code associated with performing the operation
+
+    VOS_STATUS_SUCCESS:  Success
+
+  SIDE EFFECTS
+============================================================================*/
+VOS_STATUS
+WLANSAP_SetMacACL
+(
+    v_PVOID_t  pvosGCtx,
+    tsap_Config_t *pConfig
 );
 
 /*==========================================================================
@@ -1321,7 +1413,6 @@ VOS_STATUS WLANSAP_Set_WPARSNIes(v_PVOID_t pvosGCtx, v_U8_t *pWPARSNIEs, v_U32_t
 ============================================================================*/
 VOS_STATUS WLANSAP_GetStatistics(v_PVOID_t pvosGCtx, tSap_SoftapStats *statBuf, v_BOOL_t bReset);
 
-#ifdef WLAN_FEATURE_P2P
 /*==========================================================================
 
   FUNCTION    WLANSAP_SendAction
@@ -1462,7 +1553,6 @@ VOS_STATUS WLANSAP_RegisterMgmtFrame( v_PVOID_t pvosGCtx, tANI_U16 frameType,
 ============================================================================*/
 VOS_STATUS WLANSAP_DeRegisterMgmtFrame( v_PVOID_t pvosGCtx, tANI_U16 frameType, 
                                       tANI_U8* matchData, tANI_U16 matchLen );
-#endif // WLAN_FEATURE_P2P
 
 
 #ifdef __cplusplus

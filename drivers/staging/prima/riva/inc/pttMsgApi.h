@@ -18,6 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 /**
  *
@@ -87,6 +107,11 @@ typedef enum {
    PTT_MSG_SET_NV_FIELD = 0x3021,
    PTT_MSG_STORE_NV_TABLE = 0x3022,
    PTT_MSG_SET_REG_DOMAIN = 0x3023,
+
+//new NV format Service
+   PTT_MSG_GET_NV_BIN = 0x3030,
+   PTT_MSG_SET_NV_BIN = 0x3031,
+   PTT_MSG_GET_DICTIONARY = 0x3032,
 
 //Device Register Access
    PTT_MSG_DBG_READ_REGISTER = 0x3040,
@@ -226,27 +251,32 @@ typedef enum {
 
 // Suffix'ed Message ID to differential from existing Message name.
 // ===============================================================
-    PTT_MSG_GET_NV_TABLE_PRIMA_V1 = 0x32BD,
-    PTT_MSG_SET_NV_TABLE_PRIMA_V1 = 0x32BE,
-    PTT_MSG_RX_IQ_CAL_PRIMA_V1 = 0x32BF,
-    PTT_MSG_TX_IQ_CAL_PRIMA_V1 = 0x32C0,
-    PTT_MSG_SET_TX_IQ_CORRECT_PRIMA_V1 = 0x32C1,
-    PTT_MSG_GET_TX_IQ_CORRECT_PRIMA_V1 = 0x32C2,
-    PTT_MSG_SET_RX_IQ_CORRECT_PRIMA_V1 = 0x32C3,
-    PTT_MSG_GET_RX_IQ_CORRECT_PRIMA_V1 = 0x32C4,
-    PTT_MSG_START_WAVEFORM_PRIMA_V1 = 0x32C5,
-    PTT_MSG_FORCE_PACKET_TX_GAIN_PRIMA_V1 = 0x32C6,
-    PTT_MSG_CLPC_CAL_SETUP_PRIMA_V1 = 0x32C7,
-    PTT_MSG_CLPC_CAL_RESTORE_PRIMA_V1 = 0x32C8,
-    PTT_MSG_CLOSE_TPC_LOOP_PRIMA_V1 = 0x32C9,
-    PTT_MSG_SW_CLPC_CAL_PRIMA_V1 = 0x32CA,
+   PTT_MSG_GET_NV_TABLE_PRIMA_V1 = 0x32BD,
+   PTT_MSG_SET_NV_TABLE_PRIMA_V1 = 0x32BE,
+   PTT_MSG_RX_IQ_CAL_PRIMA_V1 = 0x32BF,
+   PTT_MSG_TX_IQ_CAL_PRIMA_V1 = 0x32C0,
+   PTT_MSG_SET_TX_IQ_CORRECT_PRIMA_V1 = 0x32C1,
+   PTT_MSG_GET_TX_IQ_CORRECT_PRIMA_V1 = 0x32C2,
+   PTT_MSG_SET_RX_IQ_CORRECT_PRIMA_V1 = 0x32C3,
+   PTT_MSG_GET_RX_IQ_CORRECT_PRIMA_V1 = 0x32C4,
+   PTT_MSG_START_WAVEFORM_PRIMA_V1 = 0x32C5,
+   PTT_MSG_FORCE_PACKET_TX_GAIN_PRIMA_V1 = 0x32C6,
+   PTT_MSG_CLPC_CAL_SETUP_PRIMA_V1 = 0x32C7,
+   PTT_MSG_CLPC_CAL_RESTORE_PRIMA_V1 = 0x32C8,
+   PTT_MSG_CLOSE_TPC_LOOP_PRIMA_V1 = 0x32C9,
+   PTT_MSG_SW_CLPC_CAL_PRIMA_V1 = 0x32CA,
    PTT_MSG_CLPC_CAL_EXTRA_MEASUREMENT_PRIMA_V1 = 0x32CB,
-
+   PTT_MSG_PRIMA_GENERIC_CMD = 0x32CC,
+   PTT_MSG_DIGITAL_PIN_CONNECTIVITY_TEST_RES = 0X32CD,
 
    PTT_MSG_EXIT = 0x32ff,
    PTT_MAX_MSG_ID = PTT_MSG_EXIT
 } ePttMsgId;
 
+enum 
+{
+   PTT_MSG_PRIMA_GENERIC_CMD_FAST_SET_CHANNEL = 0x0,
+};
 
 #define PTT_MSG_TYPES_BEGIN_30          PTT_MSG_TYPES_BEGIN
 #define PTT_MSG_TYPES_BEGIN_31          PTT_MSG_TYPES_BEGIN + 0x100
@@ -310,6 +340,20 @@ typedef PACKED_PRE struct PACKED_POST {
 typedef PACKED_PRE struct PACKED_POST {
    eRegDomainId regDomainId;
 } tMsgPttSetRegDomain;
+
+typedef PACKED_PRE struct PACKED_POST {
+	tANI_U32 tableSize;
+	tANI_U32 chunkSize;
+	eNvTable nvTable;
+	tANI_U8 nvData[MAX_NV_BIN_SIZE];
+} tMsgPttGetNvBin;
+
+typedef PACKED_PRE struct PACKED_POST {
+	tANI_U32 tableSize;
+	tANI_U32 chunkSize;
+	eNvTable nvTable;
+	tANI_U8 nvData[MAX_NV_BIN_SIZE];
+} tMsgPttSetNvBin;
 
 //Device Register Access
 typedef PACKED_PRE struct PACKED_POST {
@@ -787,6 +831,18 @@ typedef PACKED_PRE struct PACKED_POST {
     eGainSteps gain;
 }tMsgPttGetDPDCorrect;
 
+typedef PACKED_PRE struct PACKED_POST {
+   tQWPTT_U32 cmdIdx;
+   tQWPTT_U32 param1;
+   tQWPTT_U32 param2;
+   tQWPTT_U32 param3;
+   tQWPTT_U32 param4;
+} tMsgPttPrimaGenericCmd;
+
+typedef PACKED_PRE struct PACKED_POST {
+   tANI_U16 testID;
+   tANI_U16 result;
+} tMsgPttPinConnTestRes;
 //#endif
 
 /******************************************************************************************************************
@@ -804,6 +860,8 @@ typedef PACKED_PRE union PACKED_POST pttMsgUnion{
    tMsgPttSetRegDomain SetRegDomain;
    tMsgPttGetNvField GetNvField;
    tMsgPttSetNvField SetNvField;
+	tMsgPttGetNvBin GetNvBin;
+	tMsgPttSetNvBin SetNvBin;
    tMsgPttDbgReadRegister DbgReadRegister;
    tMsgPttDbgWriteRegister DbgWriteRegister;
    tMsgPttDbgReadMemory DbgReadMemory;
@@ -900,6 +958,8 @@ typedef PACKED_PRE union PACKED_POST pttMsgUnion{
    tMsgPttGetDPDCorrect GetDPDCorrect;
    tMsgPttSetDPDCorrect SetDPDCorrect;
    tMsgPttDpdCal DPDCal;
+   tMsgPttPrimaGenericCmd PrimaGenericCmd;
+   tMsgPttPinConnTestRes PinConnTestRes;
 } uPttMsgs;
 
 typedef PACKED_PRE struct PACKED_POST {
@@ -912,7 +972,7 @@ typedef PACKED_PRE struct PACKED_POST {
 
 typedef PACKED_PRE struct PACKED_POST {
    /*
-    * success or failure 
+    * success or failure
     */
    tANI_U32 status;
    tPttMsgbuffer pttMsgBuffer;

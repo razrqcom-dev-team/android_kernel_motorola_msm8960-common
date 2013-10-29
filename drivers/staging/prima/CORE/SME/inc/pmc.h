@@ -18,6 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 /******************************************************************************
 *
@@ -122,10 +142,6 @@ typedef struct sPmcDeferredMsg
 } tPmcDeferredMsg;
 
 
-#ifdef FEATURE_WLAN_SCAN_PNO
-/*Pref netw found Cb declaration*/
-typedef void(*preferredNetworkFoundIndCallback)(void *callbackContext, tSirPrefNetworkFoundInd *pPrefNetworkFoundInd);
-#endif
 
 /* Current PMC information for a particular device. */
 typedef struct sPmcInfo
@@ -152,12 +168,12 @@ typedef struct sPmcInfo
     void (*impsCallbackRoutine) (void *callbackContext, eHalStatus status);  /* routine to call when IMPS period
                                                                                 has finished */ 
     void *impsCallbackContext;  /* value to be passed as parameter to routine specified above */
-    tPalTimerHandle hImpsTimer;  /* timer to use with IMPS */
+    vos_timer_t hImpsTimer;  /* timer to use with IMPS */
     vos_timer_t hTrafficTimer;  /* timer to measure traffic for BMPS */
 #ifdef FEATURE_WLAN_DIAG_SUPPORT    
-    tPalTimerHandle hDiagEvtTimer;  /* timer to report PMC state through DIAG event */
+    vos_timer_t hDiagEvtTimer;  /* timer to report PMC state through DIAG event */
 #endif
-    tPalTimerHandle hExitPowerSaveTimer;  /* timer for deferred exiting of power save mode */
+    vos_timer_t hExitPowerSaveTimer;  /* timer for deferred exiting of power save mode */
     tDblLinkList powerSaveCheckList; /* power save check routine list */
     tDblLinkList requestFullPowerList; /* request full power callback routine list */
     tANI_U32 cLastTxUnicastFrames;  /* transmit unicast frame count at last BMPS traffic timer expiration */
@@ -183,11 +199,39 @@ typedef struct sPmcInfo
 #ifdef FEATURE_WLAN_SCAN_PNO
     preferredNetworkFoundIndCallback  prefNetwFoundCB; /* routine to call for Preferred Network Found Indication */ 
     void *preferredNetworkFoundIndCallbackContext;/* value to be passed as parameter to routine specified above */
-#endif // FEATURE_WLAN_SCAN_PNLO
+#endif // FEATURE_WLAN_SCAN_PNO
 #ifdef WLAN_FEATURE_PACKET_FILTERING
     FilterMatchCountCallback  FilterMatchCountCB; /* routine to call for Packet Coalescing Filter Match Count */ 
     void *FilterMatchCountCBContext;/* value to be passed as parameter to routine specified above */
 #endif // WLAN_FEATURE_PACKET_FILTERING
+#ifdef WLAN_FEATURE_GTK_OFFLOAD
+    GTKOffloadGetInfoCallback  GtkOffloadGetInfoCB; /* routine to call for GTK Offload Information */ 
+    void *GtkOffloadGetInfoCBContext;        /* value to be passed as parameter to routine specified above */
+#endif // WLAN_FEATURE_GTK_OFFLOAD
+
+#ifdef WLAN_WAKEUP_EVENTS
+    void (*wakeReasonIndCB) (void *callbackContext, tpSirWakeReasonInd pWakeReasonInd);  /* routine to call for Wake Reason Indication */ 
+    void *wakeReasonIndCBContext;  /* value to be passed as parameter to routine specified above */
+#endif // WLAN_WAKEUP_EVENTS
+
+/* If TRUE driver will go to BMPS only if host operatiing system asks to enter BMPS.
+* For android wlan_hdd_cfg80211_set_power_mgmt API will be used to set host powersave*/
+    v_BOOL_t    isHostPsEn;
+    v_BOOL_t    ImpsReqFailed;
+    v_BOOL_t    ImpsReqTimerFailed;
+    tANI_U8     ImpsReqFailCnt;
+    tANI_U8     ImpsReqTimerfailCnt;
+
+#ifdef FEATURE_WLAN_BATCH_SCAN
+   /*HDD callback to be called after receiving SET BATCH SCAN RSP from FW*/
+   hddSetBatchScanReqCallback setBatchScanReqCallback;
+   void * setBatchScanReqCallbackContext;
+   /*HDD callback to be called after receiving BATCH SCAN iRESULT IND from FW*/
+   hddTriggerBatchScanResultIndCallback batchScanResultCallback;
+   void * batchScanResultCallbackContext;
+#endif
+
+
 } tPmcInfo, *tpPmcInfo;
 
 
@@ -243,6 +287,4 @@ extern eHalStatus pmcIssueCommand( tpAniSirGlobal pMac, eSmeCommandType cmdType,
 extern eHalStatus pmcEnterImpsCheck( tpAniSirGlobal pMac );
 extern eHalStatus pmcEnterBmpsCheck( tpAniSirGlobal pMac );
 extern tANI_BOOLEAN pmcShouldBmpsTimerRun( tpAniSirGlobal pMac );
-
-
 #endif

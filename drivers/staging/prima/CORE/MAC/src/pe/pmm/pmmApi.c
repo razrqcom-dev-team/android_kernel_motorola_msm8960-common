@@ -18,7 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
-
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 /*
  * Airgo Networks, Inc proprietary. All rights reserved.
  * This file pmmApi.cc contains functions related to the API exposed
@@ -43,6 +62,7 @@
 #include "limSendMessages.h"
 #include "cfgApi.h"
 #include "limSessionUtils.h"
+#include "limFT.h"
 
 
 #include "pmmApi.h"
@@ -84,10 +104,6 @@ tSirRetStatus
 pmmInitialize(tpAniSirGlobal pMac)
 {
 
-#if (WNI_POLARIS_FW_PRODUCT == AP)
-    pMac->pmm.gPmmNextSta = 0;
-    pMac->pmm.gPmmNumSta = 0;
-#endif
 
     pmmResetStats(pMac);
 
@@ -95,20 +111,6 @@ pmmInitialize(tpAniSirGlobal pMac)
     pMac->pmm.gPmmState = ePMM_STATE_READY;
 
 
-#ifdef ANI_PRODUCT_TYPE_AP
-
-    palZeroMemory(pMac->hHdd,
-                    pMac->pmm.gPmmTim.pTim, sizeof(tANI_U8)*pMac->lim.maxStation);
-
-    palZeroMemory(pMac->hHdd,
-                     pMac->pmm.gPmmTim.pStaInfo, sizeof(*pMac->pmm.gPmmTim.pStaInfo)*pMac->lim.maxStation);
-
-    palZeroMemory(pMac->hHdd,
-                    pMac->pmm.gpPmmStaState, sizeof(tPmmStaState)*pMac->lim.maxStation);
-
-    palZeroMemory(pMac->hHdd,
-                    pMac->pmm.gpPmmPSState, sizeof(tANI_U8)*pMac->lim.maxStation);
-#endif
 
     pMac->pmm.inMissedBeaconScenario = FALSE;
 
@@ -201,12 +203,14 @@ pmmResetStats(void *pvMac)
  * @return None
  */
 
-void pmmInitBmpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
+void pmmInitBmpsResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg )
 {
 
 
     tPmmState nextState = pMac->pmm.gPmmState;
     tSirResultCodes retStatus = eSIR_SME_SUCCESS;
+    tpPESession     psessionEntry;
+    tpEnterBmpsParams pEnterBmpsParams;
 
     /* we need to process all the deferred messages enqueued since
      * the initiating the SIR_HAL_ENTER_BMPS_REQ.
@@ -216,7 +220,7 @@ void pmmInitBmpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
     if(pMac->pmm.gPmmState != ePMM_STATE_BMPS_WT_INIT_RSP)
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("pmmBmps: Received 'InitPwrSaveRsp' while in incorrect state: %d\n"),
+            FL("pmmBmps: Received 'InitPwrSaveRsp' while in incorrect state: %d"),
             pMac->pmm.gPmmState);)
 
         retStatus = eSIR_SME_INVALID_PMM_STATE;
@@ -224,12 +228,19 @@ void pmmInitBmpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
         goto failure;
     }
 
+    if (NULL == limMsg->bodyptr)
+    {
+        PELOGE(pmmLog(pMac, LOGE, FL("pmmBmps: Received SIR_HAL_ENTER_BMPS_RSP with NULL "));)
+        goto failure;
+    }
+    pEnterBmpsParams = (tpEnterBmpsParams)(limMsg->bodyptr);
+
     //if response is success, then set PMM to BMPS_SLEEP state and send response back to PMC.
     //If response is failure, then send the response back to PMC and reset its state.
-    if(rspStatus == eHAL_STATUS_SUCCESS)
+    if(pEnterBmpsParams->status == eHAL_STATUS_SUCCESS)
     {
         PELOG2(pmmLog(pMac, LOG2,
-            FL("pmmBmps: Received successful response from HAL to enter BMPS_POWER_SAVE \n"));)
+            FL("pmmBmps: Received successful response from HAL to enter BMPS_POWER_SAVE "));)
 
         pMac->pmm.gPmmState = ePMM_STATE_BMPS_SLEEP;
 
@@ -244,7 +255,7 @@ void pmmInitBmpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
             /* Disable heartbeat timer as well */
             if(pMac->lim.limTimers.gLimHeartBeatTimer.pMac)
             {
-                MTRACE(macTrace(pMac, TRACE_CODE_TIMER_DEACTIVATE, 0, eLIM_HEART_BEAT_TIMER));
+                MTRACE(macTrace(pMac, TRACE_CODE_TIMER_DEACTIVATE, NO_SESSION, eLIM_HEART_BEAT_TIMER));
                 tx_timer_deactivate(&pMac->lim.limTimers.gLimHeartBeatTimer);
             }
         }
@@ -254,7 +265,7 @@ void pmmInitBmpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
     {
         //if init req failed, then go back to WAKEUP state.
         PELOGE(pmmLog(pMac, LOGE,
-            FL("pmmBmps: BMPS_INIT_PWR_SAVE_REQ failed, informing SME\n"));)
+            FL("pmmBmps: BMPS_INIT_PWR_SAVE_REQ failed, informing SME"));)
 
         pmmBmpsUpdateInitFailureCnt(pMac);
         nextState = ePMM_STATE_BMPS_WAKEUP;
@@ -264,6 +275,18 @@ void pmmInitBmpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
     return;
 
 failure:
+    psessionEntry = peGetValidPowerSaveSession(pMac);
+    if(psessionEntry != NULL)
+    {
+       if (pMac->lim.gLimTimersCreated && pMac->lim.limTimers.gLimHeartBeatTimer.pMac)
+       {
+           if(VOS_TRUE != tx_timer_running(&pMac->lim.limTimers.gLimHeartBeatTimer))
+           {
+               PELOGE(pmmLog(pMac, LOGE, FL("Unexpected heartbeat timer not running"));)
+               limReactivateHeartBeatTimer(pMac, psessionEntry);
+           }
+       }
+    }
 
     //Generate an error response back to PMC
     pMac->pmm.gPmmState = nextState;
@@ -297,16 +320,18 @@ void pmmExitBmpsRequestHandler(tpAniSirGlobal pMac, tpExitBmpsInfo pExitBmpsInfo
 
     tPmmState origState = pMac->pmm.gPmmState;
 
-#ifdef FEATURE_WLAN_DIAG_SUPPORT 
-    limDiagEventReport(pMac, WLAN_PE_DIAG_EXIT_BMPS_REQ_EVENT, peGetValidPowerSaveSession(pMac), 0, (tANI_U16)pExitBmpsInfo->exitBmpsReason);
-#endif //FEATURE_WLAN_DIAG_SUPPORT
-
     if (NULL == pExitBmpsInfo)
     {
-        respStatus = eSIR_SME_BMPS_REQ_FAILED;
-        PELOGW(pmmLog(pMac, LOGW, FL("pmmBmps: Rcvd EXIT_BMPS with NULL body\n"));)
+        respStatus = eSIR_SME_BMPS_REQ_REJECT;
+        PELOGW(pmmLog(pMac, LOGW, FL("pmmBmps: Rcvd EXIT_BMPS with NULL body"));)
         goto failure;
     }
+
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+    limDiagEventReport(pMac, WLAN_PE_DIAG_EXIT_BMPS_REQ_EVENT,
+                       peGetValidPowerSaveSession(pMac), 0,
+                       (tANI_U16)pExitBmpsInfo->exitBmpsReason);
+#endif //FEATURE_WLAN_DIAG_SUPPORT
 
     /* PMC is not aware of Background scan, which is done in
      * BMPS mode while Nth Beacon is delivered. Essentially, PMC
@@ -317,23 +342,23 @@ void pmmExitBmpsRequestHandler(tpAniSirGlobal pMac, tpExitBmpsInfo pExitBmpsInfo
     if(limIsSystemInScanState(pMac))
     {
         PELOGW(pmmLog(pMac, LOGW, 
-            FL("pmmBmps: Device is already awake and scanning, returning success to PMC \n"));)
+            FL("pmmBmps: Device is already awake and scanning, returning success to PMC "));)
         limSendSmeRsp(pMac, eWNI_PMC_EXIT_BMPS_RSP, respStatus, 0, 0);
         return;
     }
 
     /* send wakeup request, only when in sleep state */
-    PELOGW(pmmLog(pMac, LOGW, FL("pmmBmps: Sending eWNI_PMC_EXIT_BMPS_REQ to HAL\n"));)
+    PELOGW(pmmLog(pMac, LOGW, FL("pmmBmps: Sending eWNI_PMC_EXIT_BMPS_REQ to HAL"));)
     if (pMac->pmm.gPmmState == ePMM_STATE_BMPS_SLEEP)
     {
         /* Store the reason code for exiting BMPS. This value will be
          * checked when PMM receives SIR_HAL_EXIT_BMPS_RSP from HAL
          */
         pMac->pmm.gPmmExitBmpsReasonCode = pExitBmpsInfo->exitBmpsReason;
-        palFreeMemory( pMac->hHdd, (tANI_U8 *) pExitBmpsInfo);
+        vos_mem_free(pExitBmpsInfo);
 
         PELOGW(pmmLog(pMac, LOGW, 
-            FL("pmmBmps: Rcvd EXIT_BMPS with reason code%d \n"), pMac->pmm.gPmmExitBmpsReasonCode);)
+            FL("pmmBmps: Rcvd EXIT_BMPS with reason code%d "), pMac->pmm.gPmmExitBmpsReasonCode);)
 
 
         // Set PMM to BMPS_WT_WAKEUP_RSP state
@@ -341,25 +366,25 @@ void pmmExitBmpsRequestHandler(tpAniSirGlobal pMac, tpExitBmpsInfo pExitBmpsInfo
         if(pmmSendChangePowerSaveMsg(pMac) !=  eSIR_SUCCESS)
         {
             /* Wakeup request failed */
-            respStatus = eSIR_SME_BMPS_REQ_FAILED;
+            respStatus = eSIR_SME_BMPS_REQ_REJECT;
             pmmBmpsUpdateHalReqFailureCnt(pMac);
             goto failure;
         }
         else
         {
             PELOG1(pmmLog(pMac, LOG1,
-                          FL("pmmBmps: eWNI_PMC_EXIT_BMPS_REQ was successfully sent to HAL\n"));)
+                          FL("pmmBmps: eWNI_PMC_EXIT_BMPS_REQ was successfully sent to HAL"));)
         }
     }
     else
     {
         PELOGE(pmmLog(pMac, LOGE, 
-                      FL("pmmBmps: eWNI_PMC_EXIT_BMPS_REQ received in invalid state: %d\n"),
+                      FL("pmmBmps: eWNI_PMC_EXIT_BMPS_REQ received in invalid state: %d"),
             pMac->pmm.gPmmState );)
 
         respStatus = eSIR_SME_INVALID_PMM_STATE;
         pmmBmpsUpdateInvalidStateCnt(pMac);
-        palFreeMemory( pMac->hHdd, (tANI_U8 *) pExitBmpsInfo);
+        vos_mem_free(pExitBmpsInfo);
         goto failure;
     }
     return;
@@ -405,9 +430,25 @@ void pmmInitBmpsPwrSave(tpAniSirGlobal pMac)
 
     if((psessionEntry = peGetValidPowerSaveSession(pMac))== NULL)
     {
-        respStatus = eSIR_SME_BMPS_REQ_FAILED;
+        respStatus = eSIR_SME_BMPS_REQ_REJECT;
         goto failure;
     }
+#ifndef WLAN_ACTIVEMODE_OFFLOAD_FEATURE
+    // sending beacon filtering information down to HAL
+    if (limSendBeaconFilterInfo(pMac, psessionEntry) != eSIR_SUCCESS)
+    {
+        pmmLog(pMac, LOGE, FL("Fail to send Beacon Filter Info "));
+    }
+#else
+    if(!IS_ACTIVEMODE_OFFLOAD_FEATURE_ENABLE)
+    {
+        if (limSendBeaconFilterInfo(pMac, psessionEntry) != eSIR_SUCCESS)
+        {
+            pmmLog(pMac, LOGE, FL("Fail to send Beacon Filter Info "));
+        }
+    }
+#endif
+
 #ifdef FEATURE_WLAN_DIAG_SUPPORT 
     limDiagEventReport(pMac, WLAN_PE_DIAG_ENTER_BMPS_REQ_EVENT, psessionEntry, 0, 0);
 #endif //FEATURE_WLAN_DIAG_SUPPORT
@@ -415,11 +456,11 @@ void pmmInitBmpsPwrSave(tpAniSirGlobal pMac)
     if ( ((pMac->pmm.gPmmState != ePMM_STATE_READY) &&
          (pMac->pmm.gPmmState != ePMM_STATE_BMPS_WAKEUP)) ||
          limIsSystemInScanState(pMac) ||
-         (pMac->lim.gLimSpecMgmt.dot11hChanSwState == eLIM_11H_CHANSW_RUNNING) ||
-         (pMac->lim.gLimSpecMgmt.quietState == eLIM_QUIET_RUNNING))
+         limIsChanSwitchRunning(pMac) ||
+         limIsInQuietDuration(pMac) )
     {
         PELOGE(pmmLog(pMac, LOGE, 
-            FL("pmmBmps: BMPS Request received in invalid state PMM=%d, SME=%d, rejecting the initpwrsave request\n"), 
+            FL("pmmBmps: BMPS Request received in invalid state PMM=%d, SME=%d, rejecting the initpwrsave request"),
             pMac->pmm.gPmmState, pMac->lim.gLimSmeState);)
 
         respStatus = eSIR_SME_INVALID_PMM_STATE;
@@ -427,6 +468,20 @@ void pmmInitBmpsPwrSave(tpAniSirGlobal pMac)
         goto failure;
     }
 
+    //If we are in a missed beacon scenario, we should not be attempting to enter BMPS as heartbeat probe is going on
+    if(pMac->pmm.inMissedBeaconScenario)
+    {
+       if (pMac->lim.gLimTimersCreated && pMac->lim.limTimers.gLimHeartBeatTimer.pMac)
+       {
+           if(VOS_TRUE != tx_timer_running(&pMac->lim.limTimers.gLimHeartBeatTimer))
+           {
+               PELOGE(pmmLog(pMac, LOGE, FL("Unexpected heartbeat timer not running"));)
+               limReactivateHeartBeatTimer(pMac, psessionEntry);
+           }
+       }
+       respStatus = eSIR_SME_BMPS_REQ_REJECT;
+       goto failure;
+    }
 
     /* At this point, device is associated and PMM is not in BMPS_SLEEP state. 
      * Heartbeat timer not running is an indication that PE have detected a
@@ -439,7 +494,7 @@ void pmmInitBmpsPwrSave(tpAniSirGlobal pMac)
         if(VOS_TRUE != tx_timer_running(&pMac->lim.limTimers.gLimHeartBeatTimer)) 
         {
             PELOGE(pmmLog(pMac, LOGE, 
-                FL("Reject BMPS_REQ because HeartBeatTimer is not running. \n"));)
+                FL("Reject BMPS_REQ because HeartBeatTimer is not running. "));)
             respStatus = eSIR_SME_BMPS_REQ_FAILED;
             goto failure;
         }
@@ -454,10 +509,10 @@ void pmmInitBmpsPwrSave(tpAniSirGlobal pMac)
     if((retStatus = pmmSendInitPowerSaveMsg(pMac,psessionEntry)) != eSIR_SUCCESS)
     {
         PELOGE(pmmLog(pMac, LOGE, 
-            FL("pmmBmps: Init Power Save Request Failed: Sending Response: %d\n"), 
+            FL("pmmBmps: Init Power Save Request Failed: Sending Response: %d"),
             retStatus);)
 
-        respStatus = eSIR_SME_BMPS_REQ_FAILED;
+        respStatus = eSIR_SME_BMPS_REQ_REJECT;
         pmmBmpsUpdateHalReqFailureCnt(pMac);
         goto failure;
     }
@@ -497,41 +552,57 @@ tSirRetStatus pmmSendChangePowerSaveMsg(tpAniSirGlobal pMac)
     tSirRetStatus  retStatus = eSIR_SUCCESS;
     tpExitBmpsParams  pExitBmpsParams;
     tSirMsgQ msgQ;
+    tpPESession psessionEntry;
+    tANI_U8  currentOperatingChannel = limGetCurrentOperatingChannel(pMac);
 
-    if( eHAL_STATUS_SUCCESS != palAllocateMemory( pMac->hHdd, (void **)&pExitBmpsParams, sizeof(*pExitBmpsParams)) )
+    pExitBmpsParams = vos_mem_malloc(sizeof(*pExitBmpsParams));
+    if ( NULL == pExitBmpsParams )
     {
-        pmmLog(pMac, LOGW, FL("palAllocateMemory() failed\n"));
+        pmmLog(pMac, LOGW, FL("Failed to allocate memory"));
         retStatus = eSIR_MEM_ALLOC_FAILED;
         return retStatus;
     }
 
-    palZeroMemory( pMac->hHdd, (tANI_U8 *)pExitBmpsParams, sizeof(*pExitBmpsParams));
+    if((psessionEntry = peGetValidPowerSaveSession(pMac)) == NULL )
+    {
+        retStatus = eSIR_FAILURE;
+        vos_mem_free(pExitBmpsParams);
+        return retStatus;
+    }
+
+    vos_mem_set( (tANI_U8 *)pExitBmpsParams, sizeof(*pExitBmpsParams), 0);
     msgQ.type = WDA_EXIT_BMPS_REQ;
     msgQ.reserved = 0;
     msgQ.bodyptr = pExitBmpsParams;
     msgQ.bodyval = 0;
 
     /* If reason for full power is disconnecting (ie. link is
-     * disconnected), then we should not send data null.
+     * disconnected) or becasue of channel switch or full power requested 
+     * because of beacon miss and connected on DFS channel 
+     * then we should not send data null.
      * For all other reason code, send data null.
      */
-    if ( !SIR_IS_FULL_POWER_REASON_DISCONNECTED(pMac->pmm.gPmmExitBmpsReasonCode)  )
+    if ( !(SIR_IS_FULL_POWER_REASON_DISCONNECTED(pMac->pmm.gPmmExitBmpsReasonCode) ||
+          ( (eSME_MISSED_BEACON_IND_RCVD == pMac->pmm.gPmmExitBmpsReasonCode) && 
+             limIsconnectedOnDFSChannel(currentOperatingChannel))))
         pExitBmpsParams->sendDataNull = 1;
 
+    pExitBmpsParams->bssIdx = psessionEntry->bssIdx;
+   
     /* we need to defer any incoming messages until we
      * get a WDA_EXIT_BMPS_RSP from HAL.
      */
     SET_LIM_PROCESS_DEFD_MESGS(pMac, false);
-    MTRACE(macTraceMsgTx(pMac, 0, msgQ.type));
+    MTRACE(macTraceMsgTx(pMac, NO_SESSION, msgQ.type));
     retStatus = wdaPostCtrlMsg( pMac, &msgQ);
     if( eSIR_SUCCESS != retStatus )
     {
-        PELOGE(pmmLog( pMac, LOGE, FL("Sending WDA_EXIT_BMPS_REQ failed, reason=%X \n"), retStatus );)
-        palFreeMemory(pMac->hHdd, (tANI_U8*)pExitBmpsParams);
+        PELOGE(pmmLog( pMac, LOGE, FL("Sending WDA_EXIT_BMPS_REQ failed, reason=%X "), retStatus );)
+        vos_mem_free(pExitBmpsParams);
         return retStatus;
     }
 
-    PELOG1(pmmLog(pMac, LOG1, FL("WDA_EXIT_BMPS_REQ has been successfully sent to HAL\n"));)
+    PELOG1(pmmLog(pMac, LOG1, FL("WDA_EXIT_BMPS_REQ has been successfully sent to HAL"));)
     return retStatus;
 }
 
@@ -563,16 +634,20 @@ tSirRetStatus  pmmSendInitPowerSaveMsg(tpAniSirGlobal pMac,tpPESession psessionE
     tSirRetStatus   retCode = eSIR_SUCCESS;
     tSirMsgQ msgQ;
     tpEnterBmpsParams pBmpsParams = NULL;
+    tANI_U32    rssiFilterPeriod = 5;
+    tANI_U32    numBeaconPerRssiAverage = 20;
+    tANI_U32    bRssiFilterEnable = FALSE;
 
-    if(psessionEntry->currentBssBeaconCnt == 0)
+    if(psessionEntry->currentBssBeaconCnt == 0 )
     {
-        PELOGE(pmmLog( pMac, LOGE,  FL("Beacon count is zero, can not retrieve the TSF, failing the Enter Bmps Request\n"));)
+        PELOGE(pmmLog( pMac, LOGE,  FL("Beacon count is zero, can not retrieve the TSF, failing the Enter Bmps Request"));)
         return eSIR_FAILURE;
     }
 
-    if (palAllocateMemory(pMac->hHdd, (void **)&pBmpsParams, sizeof(tEnterBmpsParams)) != eHAL_STATUS_SUCCESS)
+    pBmpsParams = vos_mem_malloc(sizeof(tEnterBmpsParams));
+    if ( NULL == pBmpsParams )
     {
-        pmmLog(pMac, LOGP, "PMM: Not able to allocate memory for Enter Bmps\n");
+        pmmLog(pMac, LOGP, "PMM: Not able to allocate memory for Enter Bmps");
         return eSIR_FAILURE;
     }
 
@@ -583,6 +658,33 @@ tSirRetStatus  pmmSendInitPowerSaveMsg(tpAniSirGlobal pMac,tpPESession psessionE
     pBmpsParams->dtimCount = psessionEntry->lastBeaconDtimCount;
     pBmpsParams->dtimPeriod = psessionEntry->lastBeaconDtimPeriod;
     pBmpsParams->bssIdx = psessionEntry->bssIdx;
+
+    /* TODO: Config parameters (Rssi filter period, FW RSSI Monitoring
+       and Number of beacons per RSSI average) values sent down to FW during
+       initial exchange (driver load) is same as ENTER_BMPS_REQ.
+       Sending these values again in ENTER_BMPS_REQ is not required
+       (can be removed). This is kept as-is for now to support
+       backward compatibility with the older host running on new FW. */
+
+    if(wlan_cfgGetInt(pMac, WNI_CFG_RSSI_FILTER_PERIOD, &rssiFilterPeriod) != eSIR_SUCCESS)
+        pmmLog(pMac, LOGP, FL("pmmCfg: cfgGet failed for Rssi filter period"));
+    pBmpsParams->rssiFilterPeriod = (tANI_U8)rssiFilterPeriod;
+
+    if(wlan_cfgGetInt(pMac, WNI_CFG_PS_ENABLE_RSSI_MONITOR, &bRssiFilterEnable) != eSIR_SUCCESS)
+        pmmLog(pMac, LOGP, FL("pmmCfg: cfgGet failed for Rssi monitor enable flag"));
+    pBmpsParams->bRssiFilterEnable = bRssiFilterEnable;
+
+    /* The numBeaconPerRssiAverage should be less than
+       the max allowed (default set to 20 in CFG) */
+    if(wlan_cfgGetInt(pMac, WNI_CFG_NUM_BEACON_PER_RSSI_AVERAGE, &numBeaconPerRssiAverage) != eSIR_SUCCESS)
+        pmmLog(pMac, LOGP, FL("pmmCfg: cfgGet failed for num beacon per rssi"));
+
+    pBmpsParams->numBeaconPerRssiAverage =
+            (tANI_U8)GET_MIN_VALUE((tANI_U8) numBeaconPerRssiAverage, WNI_CFG_NUM_BEACON_PER_RSSI_AVERAGE_STAMAX);
+
+    pmmLog (pMac, LOG1,
+        "%s: [INFOLOG]RssiFilterInfo..%d %x %x", __func__, (int)pBmpsParams->bRssiFilterEnable,
+        (unsigned int)pBmpsParams->rssiFilterPeriod, (unsigned int)pBmpsParams->numBeaconPerRssiAverage);
 
     msgQ.type = WDA_ENTER_BMPS_REQ;
     msgQ.reserved = 0;
@@ -597,12 +699,12 @@ tSirRetStatus  pmmSendInitPowerSaveMsg(tpAniSirGlobal pMac,tpPESession psessionE
      */
     SET_LIM_PROCESS_DEFD_MESGS(pMac, false);
 
-    MTRACE(macTraceMsgTx(pMac, 0, msgQ.type));
+    MTRACE(macTraceMsgTx(pMac, psessionEntry->peSessionId, msgQ.type));
     if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
     {
-        palFreeMemory(pMac->hHdd, pBmpsParams);
+        vos_mem_free(pBmpsParams);
         PELOGE(pmmLog( pMac, LOGE,
-            FL("Posting WDA_ENTER_BMPS_REQ to HAL failed, reason=%X\n"),
+            FL("Posting WDA_ENTER_BMPS_REQ to HAL failed, reason=%X"),
             retCode );)
     }
 
@@ -642,7 +744,7 @@ tSirRetStatus pmmSendPowerSaveCfg(tpAniSirGlobal pMac, tpSirPowerSaveCfg pUpdate
     if(pMac->lim.gLimSmeState != eLIM_SME_IDLE_STATE  )
     {
         pmmLog(pMac, LOGE,
-            FL("pmmCfg: Power Save Configuration received in invalid state %d"),
+            FL("pmmCfg: Power Save Configuration received in invalid global sme state %d"),
             pMac->lim.gLimSmeState);
         retCode = eSIR_SME_INVALID_STATE;
         goto returnFailure;
@@ -687,14 +789,8 @@ tSirRetStatus pmmSendPowerSaveCfg(tpAniSirGlobal pMac, tpSirPowerSaveCfg pUpdate
         pmmLog(pMac, LOGP, FL("pmmCfg: cfgGet failed for ignoreDtim"));
     pUpdatedPwrSaveCfg->ignoreDtim = (tANI_U8) ignoreDtim;
 
-    /* The numBeaconPerRssiAverage should be <= rssiFilter Period,
-     * and less than the max allowed (default set to 20 in CFG)
-     */
-    if (numBeaconPerRssiAverage > rssiFilterPeriod)
-        pUpdatedPwrSaveCfg->numBeaconPerRssiAverage = (tANI_U8)GET_MIN_VALUE(rssiFilterPeriod, WNI_CFG_NUM_BEACON_PER_RSSI_AVERAGE_STAMAX);
-
     //Save a copy of the CFG in global pmm context.
-    palCopyMemory( pMac->hHdd, (tANI_U8 *) &pMac->pmm.gPmmCfg,  pUpdatedPwrSaveCfg, sizeof(tSirPowerSaveCfg));
+    vos_mem_copy( (tANI_U8 *) &pMac->pmm.gPmmCfg,  pUpdatedPwrSaveCfg, sizeof(tSirPowerSaveCfg));
 
 
     msgQ.type = WDA_PWR_SAVE_CFG;
@@ -703,7 +799,7 @@ tSirRetStatus pmmSendPowerSaveCfg(tpAniSirGlobal pMac, tpSirPowerSaveCfg pUpdate
     msgQ.bodyval = 0;
 
     PELOG1(pmmLog( pMac, LOG1, FL( "pmmBmps: Sending WDA_PWR_SAVE_CFG to HAL"));)
-    MTRACE(macTraceMsgTx(pMac, 0, msgQ.type));
+    MTRACE(macTraceMsgTx(pMac, NO_SESSION, msgQ.type));
     if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
     {
         pmmLog( pMac, LOGP,
@@ -718,7 +814,7 @@ returnFailure:
     /* In case of failure, we need to free the memory */
     if (NULL != pUpdatedPwrSaveCfg)
     {
-        palFreeMemory( pMac->hHdd, (tANI_U8 *) pUpdatedPwrSaveCfg);
+        vos_mem_free(pUpdatedPwrSaveCfg);
     }
     return retCode;
 }
@@ -761,7 +857,7 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
 
     if((psessionEntry = peFindSessionBySessionId(pMac,PowersavesessionId))==NULL)
     {
-        limLog(pMac, LOGP,FL("Session Does not exist for given sessionID\n"));
+        pmmLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
         return;
     }
 
@@ -781,7 +877,7 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
     if(pMac->pmm.gPmmState != ePMM_STATE_BMPS_WT_WAKEUP_RSP)
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("Received SIR_HAL_EXIT_BMPS_RSP while in incorrect state: %d\n"),
+            FL("Received SIR_HAL_EXIT_BMPS_RSP while in incorrect state: %d"),
             pMac->pmm.gPmmState);)
 
         retStatus = eSIR_SME_INVALID_PMM_STATE;
@@ -789,7 +885,7 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
     }
     else
     {
-        PELOGW(pmmLog(pMac, LOGW, FL("Received SIR_HAL_EXIT_BMPS_RSP in correct state. \n"));)
+        PELOGW(pmmLog(pMac, LOGW, FL("Received SIR_HAL_EXIT_BMPS_RSP in correct state. "));)
     }
 
     /* PE is going to wakeup irrespective of whether
@@ -820,11 +916,19 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
     pMac->sys.gSysEnableScanMode = true;
 
     // send response to PMC
-    limSendSmeRsp(pMac, eWNI_PMC_EXIT_BMPS_RSP, retStatus, 0, 0);
+   if(IS_FEATURE_SUPPORTED_BY_FW(SLM_SESSIONIZATION) )
+   {
+       limSendSmeRsp(pMac, eWNI_PMC_EXIT_BMPS_RSP, retStatus, 
+                  psessionEntry->smeSessionId, psessionEntry->transactionId);
+   }
+   else
+   {
+       limSendSmeRsp(pMac, eWNI_PMC_EXIT_BMPS_RSP, retStatus, 0, 0);
+   }
 
     if ( pMac->pmm.gPmmExitBmpsReasonCode == eSME_MISSED_BEACON_IND_RCVD)
     {
-        PELOGW(pmmLog(pMac, LOGW, FL("Rcvd SIR_HAL_EXIT_BMPS_RSP with MISSED_BEACON\n"));)
+        PELOGW(pmmLog(pMac, LOGW, FL("Rcvd SIR_HAL_EXIT_BMPS_RSP with MISSED_BEACON"));)
         pmmMissedBeaconHandler(pMac);
     }
     else if(pMac->pmm.inMissedBeaconScenario)
@@ -864,19 +968,19 @@ void pmmMissedBeaconHandler(tpAniSirGlobal pMac)
 
     if((psessionEntry = peFindSessionBySessionId(pMac,pwrSaveSessionId))==NULL)
     {
-        limLog(pMac, LOGE,FL("Session Does not exist for given sessionID\n"));
+        pmmLog(pMac, LOGE,FL("Session Does not exist for given sessionID"));
         return;
     }
 
 
-    PELOGE(pmmLog(pMac, LOG1, FL("The device woke up due to MISSED BEACON \n"));)
+    PELOGE(pmmLog(pMac, LOG1, FL("The device woke up due to MISSED BEACON "));)
 
     /* Proceed only if HeartBeat timer is created */
     if((pMac->lim.limTimers.gLimHeartBeatTimer.pMac) &&
        (pMac->lim.gLimTimersCreated))
     {
         if (wlan_cfgGetInt(pMac, WNI_CFG_BEACON_INTERVAL, &beaconInterval) != eSIR_SUCCESS)
-            PELOG1(pmmLog(pMac, LOG1, FL("Fail to get BEACON_INTERVAL value\n"));)
+            PELOG1(pmmLog(pMac, LOG1, FL("Fail to get BEACON_INTERVAL value"));)
 
         /* Change timer to reactivate it in future */
         heartBeatInterval= SYS_MS_TO_TICKS(beaconInterval * heartBeatInterval);
@@ -884,7 +988,7 @@ void pmmMissedBeaconHandler(tpAniSirGlobal pMac)
         if( tx_timer_change(&pMac->lim.limTimers.gLimHeartBeatTimer,
                             (tANI_U32)heartBeatInterval, 0) != TX_SUCCESS)
         {
-            PELOG1(pmmLog(pMac, LOG1, FL("Fail to change HeartBeat timer\n"));)
+            PELOG1(pmmLog(pMac, LOG1, FL("Fail to change HeartBeat timer"));)
         }
 
         /* update some statistics */
@@ -906,7 +1010,7 @@ void pmmMissedBeaconHandler(tpAniSirGlobal pMac)
     }
     else
     {
-        PELOGE(pmmLog(pMac, LOGE, FL("HeartBeat Timer is not created, cannot re-activate\n"));)
+        PELOGE(pmmLog(pMac, LOGE, FL("HeartBeat Timer is not created, cannot re-activate"));)
     }
 
     return;
@@ -959,7 +1063,8 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
 
     if(psessionEntry == NULL)
     {
-      PELOGE(limLog(pMac, LOGE,FL("Session does Not exist with given sessionId :%d \n"),powersavesessionId);)
+      PELOGE(pmmLog(pMac, LOGE,
+             FL("Session does Not exist with given sessionId :%d "),powersavesessionId);)
       return;
     }
 
@@ -969,7 +1074,7 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
      */
 
     PELOGW(pmmLog(pMac, LOGW, 
-           FL("pmmBmps: Received SIR_HAL_EXIT_BMPS_IND from HAL, Exiting BMPS sleep mode\n")); )
+           FL("pmmBmps: Received SIR_HAL_EXIT_BMPS_IND from HAL, Exiting BMPS sleep mode")); )
 
 
     pMac->pmm.gPmmState = ePMM_STATE_BMPS_WAKEUP;
@@ -995,7 +1100,7 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
         case eHAL_STATUS_HEARTBEAT_TMOUT:
             {
                 PELOG1(pmmLog(pMac, LOG1,
-                              FL("pmmBmps: The device woke up due to HeartBeat Timeout\n"));)
+                              FL("pmmBmps: The device woke up due to HeartBeat Timeout"));)
 
                 /* Proceed only if HeartBeat timer is created */
                 if((pMac->lim.limTimers.gLimHeartBeatTimer.pMac) &&
@@ -1012,7 +1117,7 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
                                        (tANI_U32)heartBeatInterval, 0) != TX_SUCCESS)
                     {
                         PELOG1(pmmLog(pMac, LOG1,
-                               FL("pmmBmps: Unable to change HeartBeat timer\n"));)
+                               FL("pmmBmps: Unable to change HeartBeat timer"));)
                     }
 
                     /* update some statistics */
@@ -1035,7 +1140,7 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
                 {
 
                     PELOGE(pmmLog(pMac, LOGE, 
-                           FL("pmmBmps: HeartBeat Timer is not created, cannot re-activate\n"));)
+                           FL("pmmBmps: HeartBeat Timer is not created, cannot re-activate"));)
                 }
             }
             break;
@@ -1052,38 +1157,6 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
 
 }
 
-
-// --------------------------------------------------------------------
-/**
- * pmmProcessMessageQueue
- *
- * FUNCTION:
- *
- * LOGIC:
- *
- * ASSUMPTIONS:
- *
- * NOTE:
- *
- * @param None
- * @return None
- */
-
-void pmmProcessMessageQueue(tpAniSirGlobal pMac)
-{
-#if 0
-    tSirMsgQ msg;
-
-    while (1)
-    {
-        if (tx_queue_receive(&pMac->sys.gSirPmmMsgQ, (void *) &msg, TX_WAIT_FOREVER)
-            != TX_SUCCESS)
-            break;
-
-        pmmProcessMessage(pMac, &msg);
-    }
-#endif
-}
 
 // --------------------------------------------------------------------
 /**
@@ -1110,16 +1183,13 @@ void pmmProcessMessage(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
             tpSirPowerSaveCfg pPSCfg;
             tSirMbMsg *pMbMsg = (tSirMbMsg *)pMsg->bodyptr;
 
-            if (palAllocateMemory(pMac->hHdd, (void **)&pPSCfg, sizeof(tSirPowerSaveCfg)) != eHAL_STATUS_SUCCESS)
+            pPSCfg = vos_mem_malloc(sizeof(tSirPowerSaveCfg));
+            if ( NULL == pPSCfg )
             {
-                pmmLog(pMac, LOGP, "PMM: Not able to allocate memory for PMC Config\n");
+                pmmLog(pMac, LOGP, "PMM: Not able to allocate memory for PMC Config");
             }
-            (void) palCopyMemory(pMac->hHdd, pPSCfg, pMbMsg->data, sizeof(tSirPowerSaveCfg));
+            (void) vos_mem_copy(pPSCfg, pMbMsg->data, sizeof(tSirPowerSaveCfg));
             (void) pmmSendPowerSaveCfg(pMac, pPSCfg);
-
-            // sending beacon filtering information down to HAL
-            if (limSendBeaconFilterInfo(pMac) != eSIR_SUCCESS)
-                pmmLog(pMac, LOGE, FL("Fail to send Beacon Filter Info \n"));
         }
             break;
 
@@ -1128,7 +1198,7 @@ void pmmProcessMessage(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
             break;
 
         case WDA_ENTER_BMPS_RSP:
-            pmmInitBmpsResponseHandler(pMac, (eHalStatus)pMsg->bodyval);
+            pmmInitBmpsResponseHandler(pMac, pMsg);
             break;
 
         case eWNI_PMC_EXIT_BMPS_REQ:
@@ -1136,11 +1206,12 @@ void pmmProcessMessage(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
             tpExitBmpsInfo  pExitBmpsInfo;
             tSirMbMsg      *pMbMsg = (tSirMbMsg *)pMsg->bodyptr;
 
-            if (palAllocateMemory(pMac->hHdd, (void **)&pExitBmpsInfo, sizeof(tExitBmpsInfo)) != eHAL_STATUS_SUCCESS)
+            pExitBmpsInfo = vos_mem_malloc(sizeof(tExitBmpsInfo));
+            if ( NULL == pExitBmpsInfo )
             {
-                pmmLog(pMac, LOGP, "PMM: Failed to allocate memory for Exit BMPS Info \n");
+                pmmLog(pMac, LOGP, "PMM: Failed to allocate memory for Exit BMPS Info ");
             }
-            (void) palCopyMemory(pMac->hHdd, pExitBmpsInfo, pMbMsg->data, sizeof(tExitBmpsInfo));
+            (void) vos_mem_copy(pExitBmpsInfo, pMbMsg->data, sizeof(tExitBmpsInfo));
             (void) pmmExitBmpsRequestHandler(pMac, pExitBmpsInfo);
         }
             break;
@@ -1182,7 +1253,7 @@ void pmmProcessMessage(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
             break;
 
         case WDA_EXIT_UAPSD_RSP:
-            pmmExitUapsdResponseHandler(pMac, (eHalStatus)pMsg->bodyval);
+            pmmExitUapsdResponseHandler(pMac, pMsg);
             break;
 
         case eWNI_PMC_WOWL_ADD_BCAST_PTRN:
@@ -1206,22 +1277,30 @@ void pmmProcessMessage(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
             break;
 
         case WDA_WOWL_EXIT_RSP:
-            pmmExitWowlanResponseHandler(pMac, (eHalStatus)pMsg->bodyval);
+            pmmExitWowlanResponseHandler(pMac, pMsg);
             break;
 #ifdef WLAN_FEATURE_PACKET_FILTERING
         case WDA_PACKET_COALESCING_FILTER_MATCH_COUNT_RSP:
             pmmFilterMatchCountResponseHandler(pMac, pMsg);
             break;
 #endif // WLAN_FEATURE_PACKET_FILTERING
+
+
+#ifdef WLAN_FEATURE_GTK_OFFLOAD
+        case WDA_GTK_OFFLOAD_GETINFO_RSP:
+            pmmGTKOffloadGetInfoResponseHandler(pMac, pMsg);
+            break;
+#endif // WLAN_FEATURE_GTK_OFFLOAD
+
         default:
             PELOGW(pmmLog(pMac, LOGW, 
-                FL("PMM: Unknown message in pmmMsgQ type %d, potential memory leak!!\n"),
+                FL("PMM: Unknown message in pmmMsgQ type %d, potential memory leak!!"),
                 pMsg->type);)
     }
 
     if (NULL != pMsg->bodyptr)
     {
-        palFreeMemory(pMac->hHdd, (tANI_U8 *)pMsg->bodyptr);
+        vos_mem_free(pMsg->bodyptr);
         pMsg->bodyptr = NULL;
     }
 }
@@ -1251,21 +1330,13 @@ void pmmProcessMessage(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 tSirRetStatus
 pmmPostMessage(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 {
-#if defined(VOSS_ENABLED)
     VOS_STATUS vosStatus;
     vosStatus = vos_mq_post_message(VOS_MQ_ID_PE, (vos_msg_t *) pMsg);
     if(!VOS_IS_STATUS_SUCCESS(vosStatus))
     {
-        pmmLog(pMac, LOGP, FL("vos_mq_post_message failed with status code %d\n"), vosStatus);
+        pmmLog(pMac, LOGP, FL("vos_mq_post_message failed with status code %d"), vosStatus);
         return eSIR_FAILURE;
     }
-#elif defined(ANI_OS_TYPE_WINDOWS)
-    pmmProcessMessage(pMac, pMsg);
-#else
-    if (tx_queue_send(&pMac->sys.gSirPmmMsgQ, pMsg, TX_NO_WAIT) != TX_SUCCESS)
-        return eSIR_FAILURE;
-
-#endif // VOSS_ENABLED
 
     return eSIR_SUCCESS;
 }
@@ -1403,11 +1474,11 @@ void pmmEnterImpsRequestHandler (tpAniSirGlobal pMac)
          ((pMac->lim.gLimSmeState != eLIM_SME_IDLE_STATE) &&
           (pMac->lim.gLimSmeState != eLIM_SME_JOIN_FAILURE_STATE)) ||
          (pMac->lim.gLimMlmState != eLIM_MLM_IDLE_STATE) ||
-         (pMac->lim.gLimSpecMgmt.dot11hChanSwState == eLIM_11H_CHANSW_RUNNING) ||
-         (pMac->lim.gLimSpecMgmt.quietState == eLIM_QUIET_RUNNING))
+         limIsChanSwitchRunning (pMac) ||
+         limIsInQuietDuration (pMac) )
     {
         PELOGE(pmmLog(pMac, LOGE, 
-              FL("pmmImps: PMM State = %d, MLM State = %d, SME State = %d, rejecting the sleep mode request\n"),
+              FL("pmmImps: PMM State = %d, Global MLM State = %d, Global SME State = %d, rejecting the sleep mode request"),
               pMac->pmm.gPmmState, pMac->lim.gLimMlmState, pMac->lim.gLimSmeState);)
 
         resultCode = eSIR_SME_INVALID_PMM_STATE;
@@ -1420,7 +1491,7 @@ void pmmEnterImpsRequestHandler (tpAniSirGlobal pMac)
     if( (retStatus = pmmImpsSendChangePwrSaveMsg(pMac, SIR_PM_SLEEP_MODE)) != eSIR_SUCCESS)
     {
         PELOGE(pmmLog(pMac, LOGE, 
-               FL("pmmImps: IMPS Sleep Request failed: sending response: %x\n"), retStatus);)
+               FL("pmmImps: IMPS Sleep Request failed: sending response: %x"), retStatus);)
 
         resultCode = eSIR_SME_IMPS_REQ_FAILED;
         goto failure;
@@ -1428,7 +1499,7 @@ void pmmEnterImpsRequestHandler (tpAniSirGlobal pMac)
     else
     {
         PELOG1(pmmLog(pMac, LOG1,
-               FL("pmmImps: Waiting for SoftMac response for IMPS request\n"));)
+               FL("pmmImps: Waiting for SoftMac response for IMPS request"));)
     }
     return;
 
@@ -1475,7 +1546,7 @@ void pmmEnterImpsResponseHandler (tpAniSirGlobal pMac, eHalStatus rspStatus)
     if(pMac->pmm.gPmmState != ePMM_STATE_IMPS_WT_SLEEP_RSP)
     {
         PELOGE(pmmLog(pMac, LOGE, 
-               FL("pmmImps: Receives IMPS sleep rsp in invalid state: %d\n"),
+               FL("pmmImps: Receives IMPS sleep rsp in invalid state: %d"),
                pMac->pmm.gPmmState);)
 
         resultCode = eSIR_SME_INVALID_PMM_STATE;
@@ -1490,7 +1561,7 @@ void pmmEnterImpsResponseHandler (tpAniSirGlobal pMac, eHalStatus rspStatus)
         pMac->pmm.gPmmState = ePMM_STATE_IMPS_SLEEP;
 
         PELOG2(pmmLog(pMac, LOG2,
-            FL("pmmImps: Received successful WDA_ENTER_IMPS_RSP from HAL\n"));)
+            FL("pmmImps: Received successful WDA_ENTER_IMPS_RSP from HAL"));)
 
         //update power save statistics
         pmmImpsUpdatePwrSaveStats(pMac);
@@ -1510,7 +1581,7 @@ void pmmEnterImpsResponseHandler (tpAniSirGlobal pMac, eHalStatus rspStatus)
 
 failure:
     PELOGE(pmmLog(pMac, LOGE, 
-           FL("pmmImpsSleepRsp failed, Ret Code: %d, next state will be: %d\n"),
+           FL("pmmImpsSleepRsp failed, Ret Code: %d, next state will be: %d"),
            rspStatus,
            pMac->pmm.gPmmState);)
 
@@ -1558,7 +1629,7 @@ void pmmExitImpsRequestHandler (tpAniSirGlobal pMac)
             eSIR_SUCCESS)
         {
             PELOGE(pmmLog(pMac, LOGE, 
-                   FL("pmmImps: Wakeup request message sent to SoftMac failed\n"));)
+                   FL("pmmImps: Wakeup request message sent to SoftMac failed"));)
             resultCode = eSIR_SME_IMPS_REQ_FAILED;
             goto failure;
         }
@@ -1567,7 +1638,7 @@ void pmmExitImpsRequestHandler (tpAniSirGlobal pMac)
     {
         // PE in invalid state 
         PELOGE(pmmLog(pMac, LOGE, 
-                      FL("pmmImps: Wakeup Req received in invalid state: %x\n"),
+                      FL("pmmImps: Wakeup Req received in invalid state: %x"),
                       pMac->pmm.gPmmState);)
 
         resultCode = eSIR_SME_INVALID_PMM_STATE;
@@ -1579,7 +1650,7 @@ void pmmExitImpsRequestHandler (tpAniSirGlobal pMac)
 
 failure:
     PELOGE(pmmLog (pMac, LOGE, 
-                   FL("pmmImps: Changing to IMPS wakeup mode failed, Ret Code: %d, Next State: %d\n"),
+                   FL("pmmImps: Changing to IMPS wakeup mode failed, Ret Code: %d, Next State: %d"),
                    retStatus, pMac->pmm.gPmmState);)
 
     pMac->pmm.gPmmState = origState;
@@ -1623,7 +1694,7 @@ void pmmExitImpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
     if (pMac->pmm.gPmmState != ePMM_STATE_IMPS_WT_WAKEUP_RSP)
     {
         PELOGE(pmmLog(pMac, LOGE, 
-                      FL("pmmImps: Received 'Wakeup' response in invalid state: %d\n"), 
+                      FL("pmmImps: Received 'Wakeup' response in invalid state: %d"),
                       pMac->pmm.gPmmState);)
 
         resultCode = eSIR_SME_INVALID_PMM_STATE;
@@ -1636,7 +1707,7 @@ void pmmExitImpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
         {
             resultCode = eSIR_SME_SUCCESS;
             PELOG2(pmmLog(pMac, LOG2, 
-                          FL("pmmImps: Received WDA_EXIT_IMPS_RSP with Successful response from HAL\n"));)
+                          FL("pmmImps: Received WDA_EXIT_IMPS_RSP with Successful response from HAL"));)
         }
         break;
 
@@ -1644,7 +1715,7 @@ void pmmExitImpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
             {
                 resultCode = eSIR_SME_IMPS_REQ_FAILED;
                 PELOGW(pmmLog(pMac, LOGW, 
-                              FL("pmmImps: Received WDA_EXIT_IMPS_RSP with Failure Status from HAL\n"));)
+                              FL("pmmImps: Received WDA_EXIT_IMPS_RSP with Failure Status from HAL"));)
             }
             break;
 
@@ -1693,7 +1764,7 @@ void pmmEnterUapsdRequestHandler (tpAniSirGlobal pMac)
          limIsSystemInScanState(pMac) )
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("pmmUapsd: PMM State = %d, MLM State = %d, SME State = %d, rejecting the sleep mode request\n"),
+            FL("pmmUapsd: PMM State = %d, Global MLM State = %d, Global SME State = %d, rejecting the sleep mode request"),
             pMac->pmm.gPmmState, pMac->lim.gLimMlmState, pMac->lim.gLimSmeState);)
 
         resultCode = eSIR_SME_INVALID_PMM_STATE;
@@ -1705,12 +1776,12 @@ void pmmEnterUapsdRequestHandler (tpAniSirGlobal pMac)
     if( (retStatus = pmmUapsdSendChangePwrSaveMsg(pMac, SIR_PM_SLEEP_MODE)) != eSIR_SUCCESS)
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("pmmUapsd: HAL_ENTER_UAPSD_REQ failed with response: %x\n"), retStatus);)
+            FL("pmmUapsd: HAL_ENTER_UAPSD_REQ failed with response: %x"), retStatus);)
         resultCode = eSIR_SME_UAPSD_REQ_FAILED;
         goto failure;
     }
 
-    PELOG1(pmmLog(pMac, LOG1, FL("pmmUapsd: Waiting for WDA_ENTER_UAPSD_RSP \n"));)
+    PELOG1(pmmLog(pMac, LOG1, FL("pmmUapsd: Waiting for WDA_ENTER_UAPSD_RSP "));)
     return;
 
 failure:
@@ -1739,11 +1810,16 @@ void pmmEnterUapsdResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
     tpUapsdParams    pUapsdRspMsg;
     tSirResultCodes  retStatus = eSIR_SME_SUCCESS;
 
+    tANI_U8 PowersavesessionId;
+    tpPESession psessionEntry;
+
     /* we need to process all the deferred messages enqueued since
      * the initiating the SIR_HAL_ENTER_UAPSD_REQ.
      */
     SET_LIM_PROCESS_DEFD_MESGS(pMac, true);
 
+    /* Copy the power save sessionId to the local variable */
+    PowersavesessionId = pMac->pmm.sessionId;
 
     if (NULL == limMsg->bodyptr)
     {
@@ -1753,10 +1829,16 @@ void pmmEnterUapsdResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 
     pUapsdRspMsg = (tpUapsdParams)(limMsg->bodyptr);
 
+    if((psessionEntry = peFindSessionBySessionId(pMac,PowersavesessionId))==NULL)
+    {
+        pmmLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
+        return;
+    }
+
     if(pMac->pmm.gPmmState != ePMM_STATE_UAPSD_WT_SLEEP_RSP)
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("pmmUapsd: Received SIR_HAL_ENTER_UAPSD_RSP while in incorrect state: %d\n"),
+            FL("pmmUapsd: Received SIR_HAL_ENTER_UAPSD_RSP while in incorrect state: %d"),
             pMac->pmm.gPmmState);)
         limSendSmeRsp(pMac, eWNI_PMC_ENTER_UAPSD_RSP, eSIR_SME_INVALID_PMM_STATE, 0, 0);        
         return;
@@ -1765,18 +1847,27 @@ void pmmEnterUapsdResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
     if(pUapsdRspMsg->status == eHAL_STATUS_SUCCESS)
     {
         PELOGW(pmmLog(pMac, LOGW,
-            FL("pmmUapsd: Received successful response from HAL to enter UAPSD mode \n"));)
+            FL("pmmUapsd: Received successful response from HAL to enter UAPSD mode "));)
         pMac->pmm.gPmmState = ePMM_STATE_UAPSD_SLEEP;
     }
     else
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("pmmUapsd: SIR_HAL_ENTER_UAPSD_RSP failed, informing SME\n"));)
+            FL("pmmUapsd: SIR_HAL_ENTER_UAPSD_RSP failed, informing SME"));)
         pMac->pmm.gPmmState = ePMM_STATE_BMPS_SLEEP;
         retStatus = eSIR_SME_UAPSD_REQ_FAILED;
     }
 
-    limSendSmeRsp(pMac, eWNI_PMC_ENTER_UAPSD_RSP, retStatus, 0, 0);    
+    if(IS_FEATURE_SUPPORTED_BY_FW(SLM_SESSIONIZATION))
+    {
+        limSendSmeRsp(pMac, eWNI_PMC_ENTER_UAPSD_RSP, retStatus, 
+                        psessionEntry->smeSessionId, psessionEntry->transactionId);
+    }
+    else
+    {
+        limSendSmeRsp(pMac, eWNI_PMC_ENTER_UAPSD_RSP, retStatus, 0, 0);
+    }
+
     return;
 }
 
@@ -1815,7 +1906,7 @@ void pmmExitUapsdRequestHandler(tpAniSirGlobal pMac)
                                                 eSIR_SUCCESS)
         {
             PELOGE(pmmLog(pMac, LOGE,
-                FL("pmmUapsd: sending EXIT_UAPSD to HAL failed \n"));)
+                FL("pmmUapsd: sending EXIT_UAPSD to HAL failed "));)
             resultCode = eSIR_SME_UAPSD_REQ_FAILED;
             goto failure;
         }
@@ -1823,7 +1914,7 @@ void pmmExitUapsdRequestHandler(tpAniSirGlobal pMac)
     else
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("pmmUapsd: Rcv EXIT_UAPSD from PMC in invalid state: %x\n"),
+            FL("pmmUapsd: Rcv EXIT_UAPSD from PMC in invalid state: %x"),
             pMac->pmm.gPmmState);)
 
         resultCode = eSIR_SME_INVALID_PMM_STATE;
@@ -1834,7 +1925,7 @@ void pmmExitUapsdRequestHandler(tpAniSirGlobal pMac)
 failure:
     pMac->pmm.gPmmState = origState;
     PELOGE(pmmLog(pMac, LOGE,
-        FL("pmmUapsd: Waking up from UAPSD mode failed, Ret Code: %d, Next State: %d\n"),
+        FL("pmmUapsd: Waking up from UAPSD mode failed, Ret Code: %d, Next State: %d"),
         retStatus, pMac->pmm.gPmmState);)
     limSendSmeRsp(pMac, eWNI_PMC_EXIT_UAPSD_RSP, resultCode, 0, 0);
 }
@@ -1855,9 +1946,12 @@ failure:
  * @param       Global handle to MAC
  * @return      None
  */
-void pmmExitUapsdResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
+void pmmExitUapsdResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
 {
     tSirResultCodes resultCode = eSIR_SME_SUCCESS;
+    tANI_U8 PowersavesessionId;
+    tpPESession psessionEntry;
+    tUapsdParams  *pUapsdExitRspParams;
 
     /* we need to process all the deferred messages enqueued since
      * the initiating the SIR_HAL_EXIT_UAPSD_REQ.
@@ -1867,28 +1961,52 @@ void pmmExitUapsdResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
     if (pMac->pmm.gPmmState != ePMM_STATE_UAPSD_WT_WAKEUP_RSP)
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("Received HAL_EXIT_UAPSD_RSP in invalid state: %d\n"),
+            FL("Received HAL_EXIT_UAPSD_RSP in invalid state: %d"),
             pMac->pmm.gPmmState);)
         limSendSmeRsp(pMac, eWNI_PMC_EXIT_UAPSD_RSP, eSIR_SME_INVALID_PMM_STATE, 0, 0);
         return;
     }
+    pUapsdExitRspParams = (tUapsdParams *)(limMsg->bodyptr);
 
-    switch(rspStatus)
+    PowersavesessionId = pMac->pmm.sessionId;
+    if((psessionEntry = peFindSessionBySessionId(pMac,PowersavesessionId))==NULL)
+    {
+        pmmLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
+        return;
+    }
+
+    if(NULL == pUapsdExitRspParams )
+    {
+        PELOGE(pmmLog(pMac, LOGE,
+            FL("Received HAL_EXIT_UAPSD_RSP message with zero parameters:"));)
+            limSendSmeRsp(pMac, eWNI_PMC_EXIT_UAPSD_RSP, eSIR_SME_UAPSD_REQ_FAILED, 0, 0);
+        return;
+    }
+    switch(pUapsdExitRspParams->status)
     {
         case eHAL_STATUS_SUCCESS:
             resultCode = eSIR_SME_SUCCESS;
             PELOGW(pmmLog(pMac, LOGW,
-                FL("Received SIR_HAL_EXIT_UAPSD_RSP with Successful response \n"));)
+                FL("Received SIR_HAL_EXIT_UAPSD_RSP with Successful response "));)
             break;
         default:
             resultCode = eSIR_SME_UAPSD_REQ_FAILED;
             PELOGE(pmmLog(pMac, LOGW,
-                FL("Received SIR_HAL_EXIT_UAPSD_RSP with Failure Status\n"));)
+                FL("Received SIR_HAL_EXIT_UAPSD_RSP with Failure Status"));)
             break;
     }
 
     pMac->pmm.gPmmState = ePMM_STATE_BMPS_SLEEP;
-    limSendSmeRsp(pMac, eWNI_PMC_EXIT_UAPSD_RSP, resultCode, 0, 0);
+
+    if(IS_FEATURE_SUPPORTED_BY_FW(SLM_SESSIONIZATION))
+    {
+        limSendSmeRsp(pMac, eWNI_PMC_EXIT_UAPSD_RSP, resultCode, psessionEntry->smeSessionId,
+                      psessionEntry->transactionId);
+    }
+    else
+    {
+        limSendSmeRsp(pMac, eWNI_PMC_EXIT_UAPSD_RSP, resultCode, 0, 0);
+    }
     return;
 }
 
@@ -1907,16 +2025,17 @@ void pmmSendWowlAddBcastPtrn(tpAniSirGlobal pMac,  tpSirMsgQ pMsg)
     tSirRetStatus          retCode = eSIR_SUCCESS;
     tSirMsgQ               msgQ;
 
-    if (palAllocateMemory(pMac->hHdd, (void **)&pBcastPtrn, sizeof(*pBcastPtrn)) != eHAL_STATUS_SUCCESS)
+    pBcastPtrn = vos_mem_malloc(sizeof(*pBcastPtrn));
+    if ( NULL == pBcastPtrn )
     {
-        pmmLog(pMac, LOGP, FL("Fail to allocate memory for WoWLAN Add Bcast Pattern \n"));
+        pmmLog(pMac, LOGP, FL("Fail to allocate memory for WoWLAN Add Bcast Pattern "));
         return;
     }
-    (void) palCopyMemory(pMac->hHdd, pBcastPtrn, pMbMsg->data, sizeof(*pBcastPtrn));
+    (void) vos_mem_copy(pBcastPtrn, pMbMsg->data, sizeof(*pBcastPtrn));
 
     if (NULL == pBcastPtrn)
     {
-        pmmLog(pMac, LOGE, FL("Add broadcast pattern message is NULL \n"));
+        pmmLog(pMac, LOGE, FL("Add broadcast pattern message is NULL "));
         return;
     }
 
@@ -1933,7 +2052,7 @@ void pmmSendWowlAddBcastPtrn(tpAniSirGlobal pMac,  tpSirMsgQ pMsg)
     if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
     {
         if (pBcastPtrn != NULL)
-            palFreeMemory( pMac->hHdd, (tANI_U8 *) pBcastPtrn);
+            vos_mem_free(pBcastPtrn);
         pmmLog( pMac, LOGP, FL("Posting WDA_WOWL_ADD_BCAST_PTRN failed, reason=%X"), retCode );
     }
     return;
@@ -1954,16 +2073,17 @@ void pmmSendWowlDelBcastPtrn(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
     tSirRetStatus           retCode = eSIR_SUCCESS;
     tSirMsgQ                msgQ;
 
-    if (palAllocateMemory(pMac->hHdd, (void **)&pDeletePtrn, sizeof(*pDeletePtrn)) != eHAL_STATUS_SUCCESS)
+    pDeletePtrn = vos_mem_malloc(sizeof(*pDeletePtrn));
+    if ( NULL == pDeletePtrn )
     {
-        pmmLog(pMac, LOGP, FL("Fail to allocate memory for WoWLAN Delete Bcast Pattern \n"));
+        pmmLog(pMac, LOGP, FL("Fail to allocate memory for WoWLAN Delete Bcast Pattern "));
         return;
     }
-    (void) palCopyMemory(pMac->hHdd, pDeletePtrn, pMbMsg->data, sizeof(*pDeletePtrn));
+    (void) vos_mem_copy(pDeletePtrn, pMbMsg->data, sizeof(*pDeletePtrn));
 
     if (NULL == pDeletePtrn)
     {
-        pmmLog(pMac, LOGE, FL("Delete broadcast pattern message is NULL \n"));
+        pmmLog(pMac, LOGE, FL("Delete broadcast pattern message is NULL "));
         return;
     }
 
@@ -1980,7 +2100,7 @@ void pmmSendWowlDelBcastPtrn(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
     if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
     {
         if (NULL != pDeletePtrn)
-            palFreeMemory( pMac->hHdd, (tANI_U8 *) pDeletePtrn);
+            vos_mem_free(pDeletePtrn);
         pmmLog( pMac, LOGP, FL("Posting WDA_WOWL_DEL_BCAST_PTRN failed, reason=%X"), retCode );
     }
     return;
@@ -2002,20 +2122,36 @@ void pmmEnterWowlRequestHandler(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
     tSirRetStatus  retCode = eSIR_SUCCESS;
     tANI_U32  cfgValue = 0;
     tSirMbMsg *pMbMsg = (tSirMbMsg *)pMsg->bodyptr;
+    tpPESession pSessionEntry = NULL;
+    tANI_U8  peSessionId = 0;
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT 
     limDiagEventReport(pMac, WLAN_PE_DIAG_ENTER_WOWL_REQ_EVENT, NULL, 0, 0);
 #endif //FEATURE_WLAN_DIAG_SUPPORT
 
     pSmeWowlParams = (tpSirSmeWowlEnterParams)(pMbMsg->data);
-
     if (NULL == pSmeWowlParams)
+    {
+        pmmLog(pMac, LOGE,
+               FL("NULL message received"));
         return;
+    }
+
+    pSessionEntry = peFindSessionByBssid(pMac, pSmeWowlParams->bssId,
+                                         &peSessionId);
+    if (NULL == pSessionEntry)
+    {
+        pmmLog(pMac, LOGE,
+               FL("session does not exist for given BSSId"));
+        goto end;
+    }
+    pMac->pmm.sessionId = peSessionId;
+
 // Need to fix it ASAP - TBH
 #if 0
     if (pMac->lim.gLimSmeState != eLIM_SME_LINK_EST_STATE)
     {
-        pmmLog(pMac, LOGE, FL("Rcvd PMC_ENTER_WOWL_REQ when station is not associated \n"));
+        pmmLog(pMac, LOGE, FL("Rcvd PMC_ENTER_WOWL_REQ when station is not associated "));
         limSendSmeRsp(pMac, eWNI_PMC_ENTER_WOWL_RSP, eSIR_SME_STA_NOT_ASSOCIATED, 0, 0);
         goto end;
     }
@@ -2024,61 +2160,73 @@ void pmmEnterWowlRequestHandler(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 
     if ((pMac->pmm.gPmmState != ePMM_STATE_BMPS_SLEEP) && (pMac->pmm.gPmmState != ePMM_STATE_WOWLAN))
     {
-        pmmLog(pMac, LOGE, FL("Rcvd PMC_ENTER_WOWL_REQ in invalid Power Save state \n"));
+        pmmLog(pMac, LOGE, FL("Rcvd PMC_ENTER_WOWL_REQ in invalid Power Save state "));
         limSendSmeRsp(pMac, eWNI_PMC_ENTER_WOWL_RSP, eSIR_SME_INVALID_PMM_STATE, 0, 0);
         goto end;
     }
 
-    if (palAllocateMemory(pMac->hHdd, (void **)&pHalWowlParams, sizeof(*pHalWowlParams)) != eHAL_STATUS_SUCCESS)
+    pHalWowlParams = vos_mem_malloc(sizeof(*pHalWowlParams));
+    if ( NULL == pHalWowlParams )
     {
-        pmmLog(pMac, LOGP, FL("Fail to allocate memory for Enter Wowl Request \n"));
+        pmmLog(pMac, LOGP, FL("Fail to allocate memory for Enter Wowl Request "));
         goto end;
     }
-    (void) palZeroMemory(pMac->hHdd, (tANI_U8 *)pHalWowlParams, sizeof(*pHalWowlParams) );
+    (void) vos_mem_set((tANI_U8 *)pHalWowlParams, sizeof(*pHalWowlParams), 0);
 
     // fill in the message field
     pHalWowlParams->ucMagicPktEnable = pSmeWowlParams->ucMagicPktEnable;
     pHalWowlParams->ucPatternFilteringEnable = pSmeWowlParams->ucPatternFilteringEnable;
-    (void)palCopyMemory( pMac->hHdd, (tANI_U8 *)pHalWowlParams->magicPtrn, (tANI_U8 *)pSmeWowlParams->magicPtrn, sizeof(tSirMacAddr) );
+    (void)vos_mem_copy( (tANI_U8 *)pHalWowlParams->magicPtrn, (tANI_U8 *)pSmeWowlParams->magicPtrn,
+                         sizeof(tSirMacAddr) );
+
+#ifdef WLAN_WAKEUP_EVENTS
+    pHalWowlParams->ucWoWEAPIDRequestEnable = pSmeWowlParams->ucWoWEAPIDRequestEnable;
+    pHalWowlParams->ucWoWEAPOL4WayEnable = pSmeWowlParams->ucWoWEAPOL4WayEnable;
+    pHalWowlParams->ucWowNetScanOffloadMatch = pSmeWowlParams->ucWowNetScanOffloadMatch;
+    pHalWowlParams->ucWowGTKRekeyError = pSmeWowlParams->ucWowGTKRekeyError;
+    pHalWowlParams->ucWoWBSSConnLoss = pSmeWowlParams->ucWoWBSSConnLoss;
+#endif // WLAN_WAKEUP_EVENTS
+
+    pHalWowlParams->bssIdx = pSessionEntry->bssIdx;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_UCAST_PATTERN_FILTER_ENABLE, &cfgValue) != eSIR_SUCCESS)
     {
-        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_UCAST_PATTERN_FILTER_ENABLE"));
+        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_UCAST_PATTERN_FILTER_ENABLE"));
         goto end;
     }
     pHalWowlParams->ucUcastPatternFilteringEnable = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_CHANNEL_SWITCH_ENABLE, &cfgValue) != eSIR_SUCCESS)
     {
-        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_CHANNEL_SWITCH_ENABLE"));
+        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_CHANNEL_SWITCH_ENABLE"));
         goto end;
     }
     pHalWowlParams->ucWowChnlSwitchRcv = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_DEAUTH_ENABLE, &cfgValue) != eSIR_SUCCESS)
     {
-       limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_DEAUTH_ENABLE \n"));
+       pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_DEAUTH_ENABLE "));
        goto end;
     }
     pHalWowlParams->ucWowDeauthRcv = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_DISASSOC_ENABLE, &cfgValue) != eSIR_SUCCESS)
     {
-        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_DEAUTH_ENABLE \n"));
+        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_DEAUTH_ENABLE "));
         goto end;
     }
     pHalWowlParams->ucWowDisassocRcv = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_MAX_MISSED_BEACON, &cfgValue) != eSIR_SUCCESS)
     {
-        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_MAX_MISSED_BEACON \n"));
+        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_MAX_MISSED_BEACON "));
         goto end;
     }
     pHalWowlParams->ucWowMaxMissedBeacons = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_MAX_SLEEP_PERIOD, &cfgValue) != eSIR_SUCCESS)
     {
-        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_MAX_SLEEP_PERIOD \n"));
+        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_MAX_SLEEP_PERIOD "));
         goto end;
     }
     pHalWowlParams->ucWowMaxSleepUsec = (tANI_U8)cfgValue;
@@ -2086,7 +2234,7 @@ void pmmEnterWowlRequestHandler(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
     //Send message to HAL
     if( eSIR_SUCCESS != (retCode = pmmSendWowlEnterRequest( pMac, pHalWowlParams)))
     {
-        pmmLog(pMac, LOGE, FL("Send ENTER_WOWL_REQ to HAL failed, reasonCode %d \n"), retCode);
+        pmmLog(pMac, LOGE, FL("Send ENTER_WOWL_REQ to HAL failed, reasonCode %d "), retCode);
         limSendSmeRsp(pMac, eWNI_PMC_ENTER_WOWL_RSP, eSIR_SME_WOWL_ENTER_REQ_FAILED, 0, 0);
         goto end;
     }
@@ -2094,7 +2242,7 @@ void pmmEnterWowlRequestHandler(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 
 end:
     if (pHalWowlParams != NULL)
-        palFreeMemory( pMac->hHdd, (tANI_U8 *) pHalWowlParams);
+        vos_mem_free(pHalWowlParams);
     return;
 }
 
@@ -2146,8 +2294,8 @@ tSirRetStatus pmmSendWowlEnterRequest(tpAniSirGlobal pMac, tpSirHalWowlEnterPara
  ------------------------------------------------------------*/
 void pmmEnterWowlanResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 {
-    tpSirHalWowlEnterParams  pHalWowlMsg;
-    eHalStatus            rspStatus;
+    tpSirHalWowlEnterParams  pWowlEnterParams;
+    eHalStatus               rspStatus;
     tSirResultCodes          smeRspCode = eSIR_SME_SUCCESS;
 
     /* we need to process all the deferred messages enqueued
@@ -2155,23 +2303,24 @@ void pmmEnterWowlanResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
      */
     SET_LIM_PROCESS_DEFD_MESGS(pMac, true);
 
-    pHalWowlMsg = (tpSirHalWowlEnterParams)(limMsg->bodyptr);
-    if (NULL == pHalWowlMsg)
+    pWowlEnterParams = (tpSirHalWowlEnterParams)(limMsg->bodyptr);
+    if (NULL == pWowlEnterParams)
     {
         pmmLog(pMac, LOGE, FL("Recvd WDA_WOWL_ENTER_RSP with NULL msg "));
         smeRspCode = eSIR_SME_WOWL_ENTER_REQ_FAILED;
     }
     else
     {
-        rspStatus = pHalWowlMsg->status;
+        rspStatus = pWowlEnterParams->status;
+
         if(rspStatus == eHAL_STATUS_SUCCESS)
         {
-            pmmLog(pMac, LOGW, FL("Rcv successful response from HAL to enter WOWLAN \n"));
+            pmmLog(pMac, LOGW, FL("Rcv successful response from HAL to enter WOWLAN "));
             pMac->pmm.gPmmState = ePMM_STATE_WOWLAN;
         }
         else
         {
-            pmmLog(pMac, LOGE, FL("HAL enter WOWLAN failed, informing SME\n"));
+            pmmLog(pMac, LOGE, FL("HAL enter WOWLAN failed, informing SME"));
             smeRspCode = eSIR_SME_WOWL_ENTER_REQ_FAILED;
         }
     }
@@ -2191,6 +2340,26 @@ void pmmExitWowlanRequestHandler(tpAniSirGlobal pMac)
 {
     tSirRetStatus retStatus = eSIR_SUCCESS;
     tSirResultCodes smeRspCode = eSIR_SME_SUCCESS;
+    tpPESession pSessionEntry;
+    tpSirHalWowlExitParams  pHalWowlMsg = NULL;
+    tANI_U8            PowersavesessionId = 0;
+
+    PowersavesessionId = pMac->pmm.sessionId;
+
+    if((pSessionEntry = peFindSessionBySessionId(pMac,PowersavesessionId)) == NULL )
+    {
+        PELOGW(pmmLog(pMac, LOGE, FL("pmmWowl : failed to allocate memory"));)
+        smeRspCode = eSIR_SME_WOWL_EXIT_REQ_FAILED;
+        goto failure;
+    }
+
+    pHalWowlMsg = vos_mem_malloc(sizeof(*pHalWowlMsg));
+    if ( NULL == pHalWowlMsg )
+    {
+        pmmLog(pMac, LOGP, FL("Fail to allocate memory for WoWLAN Add Bcast Pattern "));
+        smeRspCode = eSIR_SME_WOWL_EXIT_REQ_FAILED;
+        goto failure;
+    }
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT 
     limDiagEventReport(pMac, WLAN_PE_DIAG_EXIT_WOWL_REQ_EVENT, NULL, 0, 0);
@@ -2199,16 +2368,19 @@ void pmmExitWowlanRequestHandler(tpAniSirGlobal pMac)
     if ( pMac->pmm.gPmmState != ePMM_STATE_WOWLAN )
     {
         pmmLog(pMac, LOGE,
-            FL("Exit WOWLAN Request received in invalid state PMM=%d \n"),
+            FL("Exit WOWLAN Request received in invalid state PMM=%d "),
             pMac->pmm.gPmmState);
         smeRspCode = eSIR_SME_INVALID_PMM_STATE;
         goto failure;
     }
 
-    if((retStatus = pmmSendExitWowlReq(pMac)) != eSIR_SUCCESS)
+    (void) vos_mem_set((tANI_U8 *)pHalWowlMsg, sizeof(*pHalWowlMsg), 0);
+    pHalWowlMsg->bssIdx = pSessionEntry->bssIdx;
+
+    if((retStatus = pmmSendExitWowlReq(pMac, pHalWowlMsg)) != eSIR_SUCCESS)
     {
         pmmLog(pMac, LOGE,
-            FL("Fail to send WDA_WOWL_EXIT_REQ, reason code %d\n"),
+            FL("Fail to send WDA_WOWL_EXIT_REQ, reason code %d"),
             retStatus);
         smeRspCode = eSIR_SME_WOWL_EXIT_REQ_FAILED;
         goto failure;
@@ -2216,6 +2388,8 @@ void pmmExitWowlanRequestHandler(tpAniSirGlobal pMac)
     return;
 
 failure:
+    if (pHalWowlMsg != NULL)
+       vos_mem_free(pHalWowlMsg);
     limSendSmeRsp(pMac, eWNI_PMC_EXIT_WOWL_RSP, smeRspCode, 0, 0);
     return;
 }
@@ -2227,14 +2401,17 @@ failure:
 \param   tpAniSirGlobal  pMac
 \return  None
  ------------------------------------------------------------*/
-tSirRetStatus  pmmSendExitWowlReq(tpAniSirGlobal pMac)
+tSirRetStatus  pmmSendExitWowlReq(tpAniSirGlobal pMac, tpSirHalWowlExitParams pHalWowlParams)
 {
     tSirRetStatus  retCode = eSIR_SUCCESS;
     tSirMsgQ       msgQ;
 
+    if (NULL == pHalWowlParams)
+        return eSIR_FAILURE;
+
     msgQ.type = WDA_WOWL_EXIT_REQ;
     msgQ.reserved = 0;
-    msgQ.bodyptr = 0;
+    msgQ.bodyptr = pHalWowlParams;
     msgQ.bodyval = 0;
 
     pmmLog(pMac, LOGW, FL("Sending WDA_WOWL_EXIT_REQ"));
@@ -2246,7 +2423,7 @@ tSirRetStatus  pmmSendExitWowlReq(tpAniSirGlobal pMac)
 
     if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
         pmmLog( pMac, LOGE,
-            FL("Posting WDA_WOWL_EXIT_REQ failed, reason=%X\n"),
+            FL("Posting WDA_WOWL_EXIT_REQ failed, reason=%X"),
             retCode );
 
     return retCode;
@@ -2259,24 +2436,37 @@ tSirRetStatus  pmmSendExitWowlReq(tpAniSirGlobal pMac)
 \param   tpAniSirGlobal  pMac
 \return  None
  ------------------------------------------------------------*/
-void pmmExitWowlanResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
+void pmmExitWowlanResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 {
+
+    tpSirHalWowlExitParams  pHalWowlRspMsg;
+    eHalStatus   rspStatus = eHAL_STATUS_FAILURE;
+
     /* we need to process all the deferred messages enqueued
      * since the initiating the WDA_WOWL_EXIT_REQ.
      */
     SET_LIM_PROCESS_DEFD_MESGS(pMac, true);
 
-    // restore PMM state to BMPS mode
-    pMac->pmm.gPmmState = ePMM_STATE_BMPS_SLEEP;
-
-    if(rspStatus == eHAL_STATUS_SUCCESS)
+    pHalWowlRspMsg = (tpSirHalWowlExitParams)(limMsg->bodyptr);
+    if (NULL == pHalWowlRspMsg)
     {
-        pmmLog(pMac, LOGW, FL("Rcvd successful rsp from HAL to exit WOWLAN \n"));
+        pmmLog(pMac, LOGE, FL("Recvd WDA_WOWL_ENTER_RSP with NULL msg "));
+    }
+    else
+    {
+        // restore PMM state to BMPS mode
+        pMac->pmm.gPmmState = ePMM_STATE_BMPS_SLEEP;
+        rspStatus = pHalWowlRspMsg->status;
+    }
+
+    if( rspStatus == eHAL_STATUS_SUCCESS)
+    {
+        pmmLog(pMac, LOGW, FL("Rcvd successful rsp from HAL to exit WOWLAN "));
         limSendSmeRsp(pMac, eWNI_PMC_EXIT_WOWL_RSP, eSIR_SME_SUCCESS, 0, 0);
     }
     else
     {
-        pmmLog(pMac, LOGE, FL("Rcvd failure rsp from HAL to exit WOWLAN \n"));
+        pmmLog(pMac, LOGE, FL("Rcvd failure rsp from HAL to exit WOWLAN "));
         limSendSmeRsp(pMac, eWNI_PMC_EXIT_WOWL_RSP, eSIR_SME_WOWL_EXIT_REQ_FAILED, 0, 0);
     }
     return;
@@ -2310,12 +2500,12 @@ tSirRetStatus pmmImpsSendChangePwrSaveMsg(tpAniSirGlobal pMac, tANI_U8 mode)
     if (SIR_PM_SLEEP_MODE == mode)
     {
         msgQ.type = WDA_ENTER_IMPS_REQ;
-        PELOG2(pmmLog (pMac, LOG2, FL("Sending WDA_ENTER_IMPS_REQ to HAL\n"));)
+        PELOG2(pmmLog (pMac, LOG2, FL("Sending WDA_ENTER_IMPS_REQ to HAL"));)
     }
     else
     {
         msgQ.type = WDA_EXIT_IMPS_REQ;
-        PELOG2(pmmLog (pMac, LOG2, FL("Sending WDA_EXIT_IMPS_REQ to HAL\n"));)
+        PELOG2(pmmLog (pMac, LOG2, FL("Sending WDA_EXIT_IMPS_REQ to HAL"));)
     }
 
     msgQ.reserved = 0;
@@ -2326,12 +2516,12 @@ tSirRetStatus pmmImpsSendChangePwrSaveMsg(tpAniSirGlobal pMac, tANI_U8 mode)
      * WDA_ENTER_IMPS_REQ or WDA_EXIT_IMPS_RSP from HAL.
      */
     SET_LIM_PROCESS_DEFD_MESGS(pMac, false);
-    MTRACE(macTraceMsgTx(pMac, 0, msgQ.type));
+    MTRACE(macTraceMsgTx(pMac, NO_SESSION, msgQ.type));
     retStatus = wdaPostCtrlMsg(pMac, &msgQ);
     if ( eSIR_SUCCESS != retStatus )
     {
         PELOGE(pmmLog(pMac, LOGE, 
-            FL("WDA_ENTER/EXIT_IMPS_REQ to HAL failed, reason=%X\n"), retStatus);)
+            FL("WDA_ENTER/EXIT_IMPS_REQ to HAL failed, reason=%X"), retStatus);)
     }
 
     return retStatus;
@@ -2358,16 +2548,27 @@ tSirRetStatus pmmUapsdSendChangePwrSaveMsg (tpAniSirGlobal pMac, tANI_U8 mode)
     tANI_U8  uapsdDeliveryMask = 0;
     tANI_U8  uapsdTriggerMask = 0;
     tSirMsgQ msgQ;
+    tpPESession pSessionEntry;
+    tpExitUapsdParams pExitUapsdParams = NULL;
+
+    if((pSessionEntry = peGetValidPowerSaveSession(pMac)) == NULL )
+    {
+        PELOGW(pmmLog(pMac, LOGW, FL("pmmUapsd : failed to allocate memory"));)
+        retStatus = eSIR_FAILURE;
+        return retStatus;
+    }
 
     if (SIR_PM_SLEEP_MODE == mode)
     {
-        if( eHAL_STATUS_SUCCESS != palAllocateMemory( pMac->hHdd, (void **)&pUapsdParams, sizeof(tUapsdParams)) )
+        pUapsdParams = vos_mem_malloc(sizeof(tUapsdParams));
+        if ( NULL == pUapsdParams )
         {
-            PELOGW(pmmLog(pMac, LOGW, FL("pmmUapsd :palAllocateMemory() failed\n"));)
+            PELOGW(pmmLog(pMac, LOGW, FL("pmmUapsd : failed to allocate memory"));)
             retStatus = eSIR_MEM_ALLOC_FAILED;
             return retStatus;
         }
-        palZeroMemory( pMac->hHdd, (tANI_U8 *)pUapsdParams, sizeof(tUapsdParams));
+
+        vos_mem_set( (tANI_U8 *)pUapsdParams, sizeof(tUapsdParams), 0);
         msgQ.type = WDA_ENTER_UAPSD_REQ;
         msgQ.bodyptr = pUapsdParams;
 
@@ -2382,31 +2583,43 @@ tSirRetStatus pmmUapsdSendChangePwrSaveMsg (tpAniSirGlobal pMac, tANI_U8 mode)
         pUapsdParams->beTriggerEnabled = LIM_UAPSD_GET(ACBE, uapsdTriggerMask);
         pUapsdParams->viTriggerEnabled = LIM_UAPSD_GET(ACVI, uapsdTriggerMask);
         pUapsdParams->voTriggerEnabled = LIM_UAPSD_GET(ACVO, uapsdTriggerMask);
-        PELOGE(pmmLog(pMac, LOGE, 
-                      FL("UAPSD Mask:  static = 0x%x, DeliveryEnabled = 0x%x, TriggerEnabled = 0x%x \n"),
+        pUapsdParams->bssIdx = pSessionEntry->bssIdx;
+
+        PELOGW(pmmLog(pMac, LOGW,
+                      FL("UAPSD Mask:  static = 0x%x, DeliveryEnabled = 0x%x, TriggerEnabled = 0x%x "),
             pMac->lim.gUapsdPerAcBitmask,
             pMac->lim.gUapsdPerAcDeliveryEnableMask,
             pMac->lim.gUapsdPerAcTriggerEnableMask);)
 
-        PELOG1(pmmLog(pMac, LOG1, FL("Delivery Enabled: BK=%d, BE=%d, Vi=%d, Vo=%d \n"), 
+        PELOGW(pmmLog(pMac, LOGW, FL("Delivery Enabled: BK=%d, BE=%d, Vi=%d, Vo=%d "),
             pUapsdParams->bkDeliveryEnabled, 
             pUapsdParams->beDeliveryEnabled, 
             pUapsdParams->viDeliveryEnabled, 
             pUapsdParams->voDeliveryEnabled);)
 
-        PELOG1(pmmLog(pMac, LOG1, FL("Trigger Enabled: BK=%d, BE=%d, Vi=%d, Vo=%d \n"), 
+        PELOGW(pmmLog(pMac, LOGW, FL("Trigger Enabled: BK=%d, BE=%d, Vi=%d, Vo=%d "),
             pUapsdParams->bkTriggerEnabled, 
             pUapsdParams->beTriggerEnabled, 
             pUapsdParams->viTriggerEnabled, 
             pUapsdParams->voTriggerEnabled);)
 
-        PELOGW(pmmLog (pMac, LOGW, FL("pmmUapsd: Sending WDA_ENTER_UAPSD_REQ to HAL\n"));)
+        PELOGW(pmmLog (pMac, LOGW, FL("pmmUapsd: Sending WDA_ENTER_UAPSD_REQ to HAL"));)
     }
     else
     {
+        pExitUapsdParams = vos_mem_malloc(sizeof(tExitUapsdParams));
+        if ( NULL == pExitUapsdParams )
+        {
+            PELOGW(pmmLog(pMac, LOGW, FL("pmmUapsd : failed to allocate memory"));)
+            retStatus = eSIR_MEM_ALLOC_FAILED;
+            return retStatus;
+        }
+
+        vos_mem_set( (tANI_U8 *)pExitUapsdParams, sizeof(tExitUapsdParams), 0);
         msgQ.type = WDA_EXIT_UAPSD_REQ;
-        msgQ.bodyptr = NULL;
-        PELOGW(pmmLog (pMac, LOGW, FL("pmmUapsd: Sending WDA_EXIT_UAPSD_REQ to HAL\n"));)
+        msgQ.bodyptr = pExitUapsdParams;
+        pExitUapsdParams->bssIdx = pSessionEntry->bssIdx;
+        PELOGW(pmmLog (pMac, LOGW, FL("pmmUapsd: Sending WDA_EXIT_UAPSD_REQ to HAL"));)
     }
 
     /* we need to defer any incoming messages until we get a
@@ -2416,15 +2629,17 @@ tSirRetStatus pmmUapsdSendChangePwrSaveMsg (tpAniSirGlobal pMac, tANI_U8 mode)
 
     msgQ.reserved = 0;
     msgQ.bodyval = 0;
-    MTRACE(macTraceMsgTx(pMac, 0, msgQ.type));
+    MTRACE(macTraceMsgTx(pMac, NO_SESSION, msgQ.type));
     retStatus = wdaPostCtrlMsg(pMac, &msgQ);
     if ( eSIR_SUCCESS != retStatus )
     {
         PELOGE(pmmLog(pMac, LOGE, 
-            FL("pmmUapsd: WDA_ENTER/EXIT_UAPSD_REQ to HAL failed, reason=%X\n"),
+            FL("pmmUapsd: WDA_ENTER/EXIT_UAPSD_REQ to HAL failed, reason=%X"),
             retStatus);)
         if (SIR_PM_SLEEP_MODE == mode)
-            palFreeMemory(pMac->hHdd, (tANI_U8*)pUapsdParams);
+            vos_mem_free(pUapsdParams);
+        else
+            vos_mem_free(pExitUapsdParams);
     }
 
     return retStatus;
@@ -2673,7 +2888,7 @@ void pmmSendMessageToLim(tpAniSirGlobal pMac,
     if ((statusCode = limPostMsgApi(pMac, &limMsg)) != eSIR_SUCCESS)
     {
           PELOGW(pmmLog(pMac, LOGW,
-            FL("posting message %X to LIM failed, reason=%d\n"),
+            FL("posting message %X to LIM failed, reason=%d"),
             limMsg.type, statusCode);)
     }
 }
@@ -2703,12 +2918,12 @@ void pmmFilterMatchCountResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
         if (eHAL_STATUS_SUCCESS == rspStatus)
         {
             pmmLog(pMac, LOGE, FL("Rcv successful response from HAL to get "
-                "Packet Coalescing Filter Match Count\n"));
+                "Packet Coalescing Filter Match Count"));
         }
         else
         {
             pmmLog(pMac, LOGE, FL("HAL failed to get Packet Coalescing "
-                "Filter Match Count, informing SME\n"));
+                "Filter Match Count, informing SME"));
             smeRspCode = eSIR_SME_PC_FILTER_MATCH_COUNT_REQ_FAILED;
         }
     }
@@ -2718,3 +2933,40 @@ void pmmFilterMatchCountResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
     return;
 }
 #endif // WLAN_FEATURE_PACKET_FILTERING
+
+#ifdef WLAN_FEATURE_GTK_OFFLOAD
+void pmmGTKOffloadGetInfoResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
+{
+    tpSirGtkOffloadGetInfoRspParams  pGtkOffloadGetInfoRspParams;
+    eHalStatus                       rspStatus;
+    tSirResultCodes                  smeRspCode = eSIR_SME_SUCCESS;
+
+    /* we need to process all the deferred messages enqueued
+     * since the initiating the WDA_GTK_OFFLOAD_GETINFO_REQ.
+     */
+    SET_LIM_PROCESS_DEFD_MESGS(pMac, true);
+
+    pGtkOffloadGetInfoRspParams = (tpSirGtkOffloadGetInfoRspParams)(limMsg->bodyptr);
+    if (NULL == pGtkOffloadGetInfoRspParams)
+    {
+        pmmLog(pMac, LOGE, FL("Received WDA_GTK_OFFLOAD_GETINFO_RSP with NULL msg "));
+        smeRspCode = eSIR_SME_GTK_OFFLOAD_GETINFO_REQ_FAILED;
+    }
+    else
+    {
+        rspStatus = pGtkOffloadGetInfoRspParams->ulStatus;
+        if(rspStatus == eHAL_STATUS_SUCCESS)
+        {
+            pmmLog(pMac, LOGW, FL("Rcv successful response from HAL to get GTK Offload Information"));
+        }
+        else
+        {
+            pmmLog(pMac, LOGE, FL("HAL failed to get GTK Offload Information, informing SME"));
+            smeRspCode = eSIR_SME_GTK_OFFLOAD_GETINFO_REQ_FAILED;
+        }
+    }
+
+    limSendSmeRsp(pMac, eWNI_PMC_GTK_OFFLOAD_GETINFO_RSP, smeRspCode, 0, 0);
+    return;
+}
+#endif // WLAN_FEATURE_GTK_OFFLOAD

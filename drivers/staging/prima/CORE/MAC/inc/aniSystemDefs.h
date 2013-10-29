@@ -18,8 +18,29 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 /*
+ *
  * Airgo Networks, Inc proprietary. All rights reserved.
  * This file aniSystemDefs.h contains definitions used by
  * various ANI entities
@@ -78,6 +99,9 @@ typedef enum eAniAuthType
 #if defined WLAN_FEATURE_VOWIFI_11R
     eSIR_FT_AUTH,
 #endif
+#if defined FEATURE_WLAN_CCX
+    eSIR_LEAP_AUTH = 0x80,
+#endif
     eSIR_AUTO_SWITCH,
     eSIR_DONOT_USE_AUTH_TYPE = SIR_MAX_ENUM_SIZE
 } tAniAuthType;
@@ -114,9 +138,7 @@ typedef enum eAniKeyDirection
     eSIR_TX_ONLY,
     eSIR_RX_ONLY,
     eSIR_TX_RX,
-#ifdef WLAN_SOFTAP_FEATURE
     eSIR_TX_DEFAULT,
-#endif
     eSIR_DONOT_USE_KEY_DIRECTION = SIR_MAX_ENUM_SIZE
 } tAniKeyDirection;
 
@@ -154,6 +176,18 @@ typedef struct sSirAddie
     tANI_U16       length;
     tANI_U8        addIEdata[SIR_MAC_MAX_IE_LENGTH+2];
 } tSirAddie, *tpSirAddie;
+
+#ifdef FEATURE_WLAN_CCX
+
+// The CCKM IE needs to be in the
+// Join and Reassoc Req.
+typedef struct sSirCCKMie
+{
+    tANI_U16       length;
+    tANI_U8        cckmIEdata[SIR_MAC_MAX_IE_LENGTH+2];
+} tSirCCKMie, *tpSirCCKMie;
+
+#endif
 
 /// Need to refine structure definitions for Keying material,
 /// QoS policy, etc

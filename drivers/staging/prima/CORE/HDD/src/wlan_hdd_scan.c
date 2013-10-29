@@ -18,6 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 /**========================================================================
 
@@ -62,10 +82,8 @@
 #include "bap_hdd_misc.h"
 #endif
 
-#ifdef CONFIG_CFG80211
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
-#endif
 
 #define GET_IE_LEN_IN_BSS(lenInBss) ( lenInBss + sizeof(lenInBss) - \
               ((int) OFFSET_OF( tSirBssDescription, ieFields)))
@@ -265,7 +283,7 @@ static eHalStatus hdd_IndicateScanResult(hdd_scan_info_t *scanInfo, tCsrScanResu
        break;
    default:
        hddLog( LOGW, "%s: Unknown network type [%d]",
-              __FUNCTION__, descriptor->nwType);
+              __func__, descriptor->nwType);
        modestr = "?";
        break;
    }
@@ -389,7 +407,7 @@ static eHalStatus hdd_IndicateScanResult(hdd_scan_info_t *scanInfo, tCsrScanResu
       {
           int i;
 
-          numBasicRates = pDot11SuppRates->num_rates;;
+          numBasicRates = pDot11SuppRates->num_rates;
           for (i=0; i<pDot11SuppRates->num_rates; i++)
           {
               if (0 != (pDot11SuppRates->rates[i] & 0x7F))
@@ -516,7 +534,7 @@ static eHalStatus hdd_IndicateScanResult(hdd_scan_info_t *scanInfo, tCsrScanResu
    /* AGE */
    event.cmd = IWEVCUSTOM;
    p = custom;
-   p += snprintf(p, MAX_CUSTOM_LEN, " Age: %lu",
+   p += scnprintf(p, MAX_CUSTOM_LEN, " Age: %lu",
                  vos_timer_get_system_ticks() - descriptor->nReceivedTime);
    event.u.data.length = p - custom;
    current_event = iwe_stream_add_point (scanInfo->info,current_event, end,
@@ -560,7 +578,7 @@ static eHalStatus hdd_ScanRequestCallback(tHalHandle halHandle, void *pContext,
     ENTER();
 
     hddLog(LOGW,"%s called with halHandle = %p, pContext = %p, scanID = %d,"
-           " returned status = %d", __FUNCTION__, halHandle, pContext,
+           " returned status = %d", __func__, halHandle, pContext,
            (int) scanId, (int) status);
 
     /* if there is a scan request pending when the wlan driver is unloaded
@@ -570,7 +588,7 @@ static eHalStatus hdd_ScanRequestCallback(tHalHandle halHandle, void *pContext,
     if (pAdapter->dev != dev)
     {
        hddLog(LOGW, "%s: device mismatch %p vs %p",
-               __FUNCTION__, pAdapter->dev, dev);
+               __func__, pAdapter->dev, dev);
         return eHAL_STATUS_SUCCESS;
     }
 
@@ -578,7 +596,7 @@ static eHalStatus hdd_ScanRequestCallback(tHalHandle halHandle, void *pContext,
     if (pHddCtx->scan_info.scanId != scanId)
     {
         hddLog(LOGW, "%s called with mismatched scanId pHddCtx->scan_info.scanId = %d "
-               "scanId = %d ", __FUNCTION__, (int) pHddCtx->scan_info.scanId,
+               "scanId = %d ", __func__, (int) pHddCtx->scan_info.scanId,
                 (int) scanId);
     }
 
@@ -677,7 +695,7 @@ int iw_set_scan(struct net_device *dev, struct iw_request_info *info,
               else
               {
                 scanRequest.SSIDs.numOfSSIDs = 0;
-                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, "%s: Unable to allocate memory",__FUNCTION__);
+                VOS_TRACE( VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, "%s: Unable to allocate memory",__func__);
                 VOS_ASSERT(0);
               }
           }
@@ -858,14 +876,14 @@ static eHalStatus hdd_CscanRequestCallback(tHalHandle halHandle, void *pContext,
     ENTER();
 
     hddLog(LOG1,"%s called with halHandle = %p, pContext = %p, scanID = %d,"
-           " returned status = %d", __FUNCTION__, halHandle, pContext,
+           " returned status = %d", __func__, halHandle, pContext,
             (int) scanId, (int) status);
 
     /* Check the scanId */
     if (pwextBuf->scanId != scanId)
     {
         hddLog(LOGW, "%s called with mismatched scanId pWextState->scanId = %d "
-               "scanId = %d ", __FUNCTION__, (int) pwextBuf->scanId,
+               "scanId = %d ", __func__, (int) pwextBuf->scanId,
                 (int) scanId);
     }
 
@@ -909,14 +927,14 @@ int iw_set_cscan(struct net_device *dev, struct iw_request_info *info,
 
 #ifdef WLAN_BTAMP_FEATURE
     //Scan not supported when AMP traffic is on.
-    if( VOS_TRUE == WLANBAP_AmpSessionOn() ) 
+    if( VOS_TRUE == WLANBAP_AmpSessionOn() )
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_ERROR, "%s: No scanning when AMP is on",__func__);
         return eHAL_STATUS_SUCCESS;
     }
 #endif
 
-    if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress) 
+    if ((WLAN_HDD_GET_CTX(pAdapter))->isLogpInProgress)
     {
         VOS_TRACE(VOS_MODULE_ID_HDD, VOS_TRACE_LEVEL_FATAL, "%s:LOGP in Progress. Ignore!!!",__func__);
         return eHAL_STATUS_SUCCESS;
@@ -973,7 +991,7 @@ int iw_set_cscan(struct net_device *dev, struct iw_request_info *info,
             }
         }
         pHddCtx->scan_info.waitScanResult = FALSE;
-		
+
         /* Check for scan IE */
         while( WEXT_CSCAN_SSID_SECTION == str_ptr[i] ) 
         {
@@ -1155,8 +1173,8 @@ exit_point:
 }
 
 /* Abort any MAC scan if in progress */
-void hdd_abort_mac_scan(hdd_context_t* pHddCtx)
+void hdd_abort_mac_scan(hdd_context_t* pHddCtx, tANI_U8 sessionId)
 {
-    sme_AbortMacScan(pHddCtx->hHal);
+    sme_AbortMacScan(pHddCtx->hHal, sessionId);
 }
 

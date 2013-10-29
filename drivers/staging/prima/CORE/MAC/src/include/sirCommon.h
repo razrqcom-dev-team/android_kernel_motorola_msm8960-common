@@ -36,11 +36,7 @@
 
 #include "sirApi.h"
 #include "sirParams.h"
-#include "sirWrapper.h"
-
-#ifndef NULL
-#define NULL TX_NULL
-#endif
+#include "VossWrapper.h"
 
 /* ********************************************* *
  *                                               *
