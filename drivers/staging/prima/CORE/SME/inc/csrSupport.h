@@ -18,6 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 /** ------------------------------------------------------------------------- * 
     ------------------------------------------------------------------------- *  
@@ -27,8 +47,7 @@
   
     Exports and types for the Common Scan and Roaming supporting interfaces.
   
-    Copyright (C) 2006 Airgo Networks, Incorporated
-  
+   Copyright (C) 2006 Airgo Networks, Incorporated
  
    ========================================================================== */
 #ifndef CSR_SUPPORT_H__
@@ -49,7 +68,7 @@
 
 #define CSR_RSN_OUI_SIZE              ( 4 )
 #define CSR_RSN_VERSION_SUPPORTED     ( 1 )
-#define CSR_RSN_MAX_AUTH_SUITES       ( 2 )
+#define CSR_RSN_MAX_AUTH_SUITES       ( 16 )
 #define CSR_RSN_MAX_CYPHERS           ( 5 )
 #define CSR_RSN_MAX_UNICAST_CYPHERS   ( 5 )
 #define CSR_RSN_MAX_MULTICAST_CYPHERS ( 1 )
@@ -92,6 +111,19 @@
 #define CSR_PASSIVE_SCAN_CAT2_HIGH      5725
 #define CSR_PASSIVE_SCAN_CAT3_LOW       5500 
 #define CSR_PASSIVE_SCAN_CAT3_HIGH      5560
+
+#define CSR_OUI_USE_GROUP_CIPHER_INDEX 0x00
+#define CSR_OUI_WEP40_OR_1X_INDEX      0x01
+#define CSR_OUI_TKIP_OR_PSK_INDEX      0x02
+#define CSR_OUI_RESERVED_INDEX         0x03
+#define CSR_OUI_AES_INDEX              0x04
+#define CSR_OUI_WEP104_INDEX           0x05
+
+#ifdef FEATURE_WLAN_WAPI
+#define CSR_OUI_WAPI_RESERVED_INDEX    0x00
+#define CSR_OUI_WAPI_WAI_CERT_OR_SMS4_INDEX    0x01
+#define CSR_OUI_WAPI_WAI_PSK_INDEX     0x02
+#endif /* FEATURE_WLAN_WAPI */
 
 
 typedef enum 
@@ -786,6 +818,28 @@ eHalStatus csrGetPhyModeFromBss(tpAniSirGlobal pMac, tSirBssDescription *pBSSDes
 eHalStatus csrReassoc(tpAniSirGlobal pMac, tANI_U32 sessionId,
                       tCsrRoamModifyProfileFields *pModProfileFields,
                       tANI_U32 *pRoamId, v_BOOL_t fForce);
+
+eHalStatus
+csrIsconcurrentsessionValid(tpAniSirGlobal pMac,tANI_U32 cursessionId,
+                                 tVOS_CON_MODE currBssPersona);
+
+//Update beaconInterval for P2P-GO case if it is different 
+eHalStatus csrUpdatep2pBeaconInterval(tpAniSirGlobal pMac);
+
+//BeaconInterval validation for MCC support
+eHalStatus csrValidateMCCBeaconInterval(tpAniSirGlobal pMac, tANI_U8 channelId,
+                                     tANI_U16 *beaconInterval, tANI_U32 cursessionId,
+                                     tVOS_CON_MODE currBssPersona);
+
+#ifdef WLAN_FEATURE_VOWIFI_11R
+tANI_BOOLEAN csrIsProfile11r( tCsrRoamProfile *pProfile );
+tANI_BOOLEAN csrIsAuthType11r( eCsrAuthType AuthType, tANI_U8 mdiePresent);
+#endif
+
+#ifdef FEATURE_WLAN_CCX
+tANI_BOOLEAN csrIsAuthTypeCCX( eCsrAuthType AuthType );
+tANI_BOOLEAN csrIsProfileCCX( tCsrRoamProfile *pProfile );
+#endif
 
 #endif
 

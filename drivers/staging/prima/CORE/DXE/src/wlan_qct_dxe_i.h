@@ -18,6 +18,27 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
 
 #ifndef WLAN_QCT_DXE_I_H
 #define WLAN_QCT_DXE_I_H
@@ -29,9 +50,9 @@
   @brief 
                
    This file contains the external API exposed by the wlan data transfer abstraction layer module.
-   Copyright (c) 2011 QUALCOMM Incorporated.
+   Copyright (c) 2011 Qualcomm Technologies, Inc.
    All Rights Reserved.
-   Qualcomm Confidential and Proprietary
+   Qualcomm Technologies Confidential and Proprietary
 ========================================================================*/
 
 /*===========================================================================
@@ -63,6 +84,7 @@ when           who        what, where, why
  * -------------------------------------------------------------------------*/
 #include "wlan_qct_dxe.h"
 #include "wlan_qct_pal_trace.h"
+#include "wlan_qct_pal_timer.h"
 #include "vos_trace.h"
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -70,68 +92,78 @@ when           who        what, where, why
 #define WLANDXE_CTXT_COOKIE              0xC00CC111
 
 
-/* From here RIVA DXE register information
+/* From here WCNSS DXE register information
  * This is temporary definition location to make compile and unit test
  * If official msmreg.h integrated, this part will be eliminated */
 /* Start with base address */
 
-#define WLANDXE_BMU_AVAILABLE_BD_PDU     0x03080084
-
+#ifdef WCN_PRONTO
+#define WLANDXE_CCU_DXE_INT_SELECT       0xfb2050dc
+#define WLANDXE_CCU_DXE_INT_SELECT_STAT  0xfb2050e0
+#define WLANDXE_CCU_ASIC_INT_ENABLE      0xfb2050e4
+#else
 #define WLANDXE_CCU_DXE_INT_SELECT       0x03200b10
 #define WLANDXE_CCU_DXE_INT_SELECT_STAT  0x03200b14
 #define WLANDXE_CCU_ASIC_INT_ENABLE      0x03200b18
+#endif
 
 #ifdef PAL_OS_TYPE_BMP
-#define WLANDXE_RIVA_BASE_ADDRESS        0xCDD00000
+#define WLANDXE_WCNSS_BASE_ADDRESS        0xCDD00000
 #else
-#define WLANDXE_RIVA_BASE_ADDRESS        0x03000000
+#ifdef WCN_PRONTO
+#define WLANDXE_WCNSS_BASE_ADDRESS        0xfb000000
+#else
+#define WLANDXE_WCNSS_BASE_ADDRESS        0x03000000
+#endif
 #endif /* PAL_OS_TYPE_BMP */
 
-#define WLANDXE_REGISTER_BASE_ADDRESS    WLANDXE_RIVA_BASE_ADDRESS + 0x202000
+#define WLANDXE_BMU_AVAILABLE_BD_PDU     (WLANDXE_WCNSS_BASE_ADDRESS + 0x80084)
+
+#define WLANDXE_REGISTER_BASE_ADDRESS    (WLANDXE_WCNSS_BASE_ADDRESS + 0x202000)
 
 /* Common over the channels register addresses */
-#define WALNDEX_DMA_CSR_ADDRESS          WLANDXE_REGISTER_BASE_ADDRESS + 0x00
-#define WALNDEX_DMA_ENCH_ADDRESS         WLANDXE_REGISTER_BASE_ADDRESS + 0x04
-#define WALNDEX_DMA_CH_EN_ADDRESS        WLANDXE_REGISTER_BASE_ADDRESS + 0x08
-#define WALNDEX_DMA_CH_DONE_ADDRESS      WLANDXE_REGISTER_BASE_ADDRESS + 0x0C
-#define WALNDEX_DMA_CH_ERR_ADDRESS       WLANDXE_REGISTER_BASE_ADDRESS + 0x10
-#define WALNDEX_DMA_CH_STOP_ADDRESS      WLANDXE_REGISTER_BASE_ADDRESS + 0x14
+#define WALNDEX_DMA_CSR_ADDRESS          (WLANDXE_REGISTER_BASE_ADDRESS + 0x00)
+#define WALNDEX_DMA_ENCH_ADDRESS         (WLANDXE_REGISTER_BASE_ADDRESS + 0x04)
+#define WALNDEX_DMA_CH_EN_ADDRESS        (WLANDXE_REGISTER_BASE_ADDRESS + 0x08)
+#define WALNDEX_DMA_CH_DONE_ADDRESS      (WLANDXE_REGISTER_BASE_ADDRESS + 0x0C)
+#define WALNDEX_DMA_CH_ERR_ADDRESS       (WLANDXE_REGISTER_BASE_ADDRESS + 0x10)
+#define WALNDEX_DMA_CH_STOP_ADDRESS      (WLANDXE_REGISTER_BASE_ADDRESS + 0x14)
 
 /* Interrupt Control register address */
-#define WLANDXE_INT_MASK_REG_ADDRESS     WLANDXE_REGISTER_BASE_ADDRESS + 0x18
-#define WLANDXE_INT_SRC_MSKD_ADDRESS     WLANDXE_REGISTER_BASE_ADDRESS + 0x1C
-#define WLANDXE_INT_SRC_RAW_ADDRESS      WLANDXE_REGISTER_BASE_ADDRESS + 0x20
-#define WLANDXE_INT_ED_SRC_ADDRESS       WLANDXE_REGISTER_BASE_ADDRESS + 0x24
-#define WLANDXE_INT_DONE_SRC_ADDRESS     WLANDXE_REGISTER_BASE_ADDRESS + 0x28
-#define WLANDXE_INT_ERR_SRC_ADDRESS      WLANDXE_REGISTER_BASE_ADDRESS + 0x2C
-#define WLANDXE_INT_CLR_ADDRESS          WLANDXE_REGISTER_BASE_ADDRESS + 0x30
-#define WLANDXE_INT_ED_CLR_ADDRESS       WLANDXE_REGISTER_BASE_ADDRESS + 0x34
-#define WLANDXE_INT_DONE_CLR_ADDRESS     WLANDXE_REGISTER_BASE_ADDRESS + 0x38
-#define WLANDXE_INT_ERR_CLR_ADDRESS      WLANDXE_REGISTER_BASE_ADDRESS + 0x3C
+#define WLANDXE_INT_MASK_REG_ADDRESS     (WLANDXE_REGISTER_BASE_ADDRESS + 0x18)
+#define WLANDXE_INT_SRC_MSKD_ADDRESS     (WLANDXE_REGISTER_BASE_ADDRESS + 0x1C)
+#define WLANDXE_INT_SRC_RAW_ADDRESS      (WLANDXE_REGISTER_BASE_ADDRESS + 0x20)
+#define WLANDXE_INT_ED_SRC_ADDRESS       (WLANDXE_REGISTER_BASE_ADDRESS + 0x24)
+#define WLANDXE_INT_DONE_SRC_ADDRESS     (WLANDXE_REGISTER_BASE_ADDRESS + 0x28)
+#define WLANDXE_INT_ERR_SRC_ADDRESS      (WLANDXE_REGISTER_BASE_ADDRESS + 0x2C)
+#define WLANDXE_INT_CLR_ADDRESS          (WLANDXE_REGISTER_BASE_ADDRESS + 0x30)
+#define WLANDXE_INT_ED_CLR_ADDRESS       (WLANDXE_REGISTER_BASE_ADDRESS + 0x34)
+#define WLANDXE_INT_DONE_CLR_ADDRESS     (WLANDXE_REGISTER_BASE_ADDRESS + 0x38)
+#define WLANDXE_INT_ERR_CLR_ADDRESS      (WLANDXE_REGISTER_BASE_ADDRESS + 0x3C)
 
-#define WLANDXE_DMA_CH_PRES_ADDRESS      WLANDXE_REGISTER_BASE_ADDRESS + 0x40
-#define WLANDXE_ARB_CH_MSK_CLR_ADDRRESS  WLANDXE_REGISTER_BASE_ADDRESS + 0x74
+#define WLANDXE_DMA_CH_PRES_ADDRESS      (WLANDXE_REGISTER_BASE_ADDRESS + 0x40)
+#define WLANDXE_ARB_CH_MSK_CLR_ADDRRESS  (WLANDXE_REGISTER_BASE_ADDRESS + 0x74)
 
 /* Channel Counter register */
-#define WLANDXE_DMA_COUNTER_0            WLANDXE_REGISTER_BASE_ADDRESS + 0x200
-#define WLANDXE_DMA_COUNTER_1            WLANDXE_REGISTER_BASE_ADDRESS + 0x204
-#define WLANDXE_DMA_COUNTER_2            WLANDXE_REGISTER_BASE_ADDRESS + 0x208
-#define WLANDXE_DMA_COUNTER_3            WLANDXE_REGISTER_BASE_ADDRESS + 0x20C
-#define WLANDXE_DMA_COUNTER_4            WLANDXE_REGISTER_BASE_ADDRESS + 0x210
-#define WLANDXE_DMA_COUNTER_5            WLANDXE_REGISTER_BASE_ADDRESS + 0x214
-#define WLANDXE_DMA_COUNTER_6            WLANDXE_REGISTER_BASE_ADDRESS + 0x218
+#define WLANDXE_DMA_COUNTER_0            (WLANDXE_REGISTER_BASE_ADDRESS + 0x200)
+#define WLANDXE_DMA_COUNTER_1            (WLANDXE_REGISTER_BASE_ADDRESS + 0x204)
+#define WLANDXE_DMA_COUNTER_2            (WLANDXE_REGISTER_BASE_ADDRESS + 0x208)
+#define WLANDXE_DMA_COUNTER_3            (WLANDXE_REGISTER_BASE_ADDRESS + 0x20C)
+#define WLANDXE_DMA_COUNTER_4            (WLANDXE_REGISTER_BASE_ADDRESS + 0x210)
+#define WLANDXE_DMA_COUNTER_5            (WLANDXE_REGISTER_BASE_ADDRESS + 0x214)
+#define WLANDXE_DMA_COUNTER_6            (WLANDXE_REGISTER_BASE_ADDRESS + 0x218)
 
-#define WLANDXE_ENGINE_STAT_ADDRESS      WLANDXE_REGISTER_BASE_ADDRESS + 0x64
-#define WLANDXE_BMU_SB_QDAT_AV_ADDRESS   WLANDXE_REGISTER_BASE_ADDRESS + 0x5c
+#define WLANDXE_ENGINE_STAT_ADDRESS      (WLANDXE_REGISTER_BASE_ADDRESS + 0x64)
+#define WLANDXE_BMU_SB_QDAT_AV_ADDRESS   (WLANDXE_REGISTER_BASE_ADDRESS + 0x5c)
 
 /* Channel Base address */
-#define WLANDXE_DMA_CHAN0_BASE_ADDRESS   WLANDXE_REGISTER_BASE_ADDRESS + 0x400
-#define WLANDXE_DMA_CHAN1_BASE_ADDRESS   WLANDXE_REGISTER_BASE_ADDRESS + 0x440
-#define WLANDXE_DMA_CHAN2_BASE_ADDRESS   WLANDXE_REGISTER_BASE_ADDRESS + 0x480
-#define WLANDXE_DMA_CHAN3_BASE_ADDRESS   WLANDXE_REGISTER_BASE_ADDRESS + 0x4C0
-#define WLANDXE_DMA_CHAN4_BASE_ADDRESS   WLANDXE_REGISTER_BASE_ADDRESS + 0x500
-#define WLANDXE_DMA_CHAN5_BASE_ADDRESS   WLANDXE_REGISTER_BASE_ADDRESS + 0x540
-#define WLANDXE_DMA_CHAN6_BASE_ADDRESS   WLANDXE_REGISTER_BASE_ADDRESS + 0x580
+#define WLANDXE_DMA_CHAN0_BASE_ADDRESS   (WLANDXE_REGISTER_BASE_ADDRESS + 0x400)
+#define WLANDXE_DMA_CHAN1_BASE_ADDRESS   (WLANDXE_REGISTER_BASE_ADDRESS + 0x440)
+#define WLANDXE_DMA_CHAN2_BASE_ADDRESS   (WLANDXE_REGISTER_BASE_ADDRESS + 0x480)
+#define WLANDXE_DMA_CHAN3_BASE_ADDRESS   (WLANDXE_REGISTER_BASE_ADDRESS + 0x4C0)
+#define WLANDXE_DMA_CHAN4_BASE_ADDRESS   (WLANDXE_REGISTER_BASE_ADDRESS + 0x500)
+#define WLANDXE_DMA_CHAN5_BASE_ADDRESS   (WLANDXE_REGISTER_BASE_ADDRESS + 0x540)
+#define WLANDXE_DMA_CHAN6_BASE_ADDRESS   (WLANDXE_REGISTER_BASE_ADDRESS + 0x580)
 
 /* Channel specific register offset */
 #define WLANDXE_DMA_CH_CTRL_REG          0x0000
@@ -347,7 +379,8 @@ when           who        what, where, why
 #define WLANDXE_CH_STAT_INT_ED_MASK     0x00002000
 
 #define WLANDXE_CH_STAT_MASKED_MASK     0x00000008
-/* Till here RIVA DXE register information
+#define WLANDXE_CH_STAT_ENABLED_MASK    0x00000001
+/* Till here WCNSS DXE register information
  * This is temporary definition location to make compile and unit test
  * If official msmreg.h integrated, this part will be eliminated */
 
@@ -359,6 +392,8 @@ when           who        what, where, why
 #define WLANDXE_INT_MASK_CHAN_4          0x00000010
 #define WLANDXE_INT_MASK_CHAN_5          0x00000020
 #define WLANDXE_INT_MASK_CHAN_6          0x00000040
+
+#define WLANDXE_TX_LOW_RES_THRESHOLD     (5)
 
 /* DXE Descriptor Endian swap macro */
 #ifdef WLANDXE_ENDIAN_SWAP_ENABLE
@@ -568,12 +603,15 @@ typedef struct
    WLANDXE_ChannelExConfigType     extraConfig;
    WLANDXE_DMAChannelType          assignedDMAChannel;
    wpt_uint64                      rxDoneHistogram;
+   wpt_timer                       healthMonitorTimer;
+   wpt_msg                        *healthMonitorMsg;
 } WLANDXE_ChannelCBType;
 
 typedef struct
 {
    WLANDXE_TXCompIntEnableType     txIntEnable;
-   unsigned int                    txLowResourceThreshold;
+   unsigned int                    txLowResourceThreshold_LoPriCh;
+   unsigned int                    txLowResourceThreshold_HiPriCh;
    unsigned int                    rxLowResourceThreshold;
    unsigned int                    txInterruptEnableFrameCount;
    unsigned int                    txInterruptEnablePeriod;
@@ -605,6 +643,8 @@ typedef struct
    wpt_packet                     *freeRXPacket;
    wpt_boolean                     rxPalPacketUnavailable;
    wpt_boolean                     driverReloadInProcessing;
+   wpt_boolean                     smsmToggled;
+   wpt_timer                       rxResourceAvailableTimer;
 } WLANDXE_CtrlBlkType;
 
 /*==========================================================================

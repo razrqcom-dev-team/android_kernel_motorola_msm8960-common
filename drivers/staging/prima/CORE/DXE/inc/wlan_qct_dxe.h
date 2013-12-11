@@ -18,6 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 #ifndef WLAN_QCT_DXE_H
 #define WLAN_QCT_DXE_H
@@ -80,8 +100,17 @@ when           who        what, where, why
 #define WLANDXE_DEFAULT_RX_OS_BUFFER_SIZE  (VPKT_SIZE_BUFFER)
 
 /*The maximum number of packets that can be chained in dxe for the Low 
-  priority channel */
+  priority channel
+  Note: Increased it to 240 from 128 for Windows(EA) becase Windows is
+  able to push 2~6 packet chain in one NET_BUFFER. It causes TX low
+  resource condition more easily than LA. It ends up to cause low 
+  throughut number and spend more CPU time*/
+#ifdef WINDOWS_DT
+#define WLANDXE_LO_PRI_RES_NUM 240
+#else
 #define WLANDXE_LO_PRI_RES_NUM 128
+#endif
+
 
 /*The maximum number of packets that can be chained in dxe for the HI 
   priority channel */
@@ -114,7 +143,7 @@ typedef enum
        RX Frame Ready indication CB
 
   @  Parameters
-         pVoid         pAdaptor : Driver global control block pointer
+         pVoid         pAdapter : Driver global control block pointer
          palPacket     pRXFramePtr : Received Frame Pointer
          pVoid         userCtxt : DTS user contect pointer
 
@@ -131,7 +160,7 @@ typedef WDTS_RxFrameReadyCbType WLANDXE_RxFrameReadyCbType;
       TX complete indication CB
 
   @  Parameters
-         pVoid      pAdaptor : Driver global control block pointer
+         pVoid      pAdapter : Driver global control block pointer
          void       pTXFramePtr : Completed TX Frame Pointer
          pVoid      userCtxt : DTS user contect pointer
 
@@ -148,7 +177,7 @@ typedef WDTS_TxCompleteCbType WLANDXE_TxCompleteCbType;
        DXE Low resource indication CB
 
   @  Parameters
-      pVoid      pAdaptor : Driver global control block pointer
+      pVoid      pAdapter : Driver global control block pointer
       BOOL      lowResourceCondition : DXE low resource or not
       pVoid      userCtxt : DTS user contect pointer
 
@@ -187,7 +216,7 @@ typedef WDTS_SetPSCbType  WLANDXE_SetPowerStateCbType;
       Allocate, DXE local control block, DXE descriptor pool, DXE descriptor control block pool
 
   @  Parameters
-      pVoid      pAdaptor : Driver global control block pointer
+      pVoid      pAdapter : Driver global control block pointer
 
   @  Return
       pVoid DXE local module control block pointer
@@ -274,6 +303,7 @@ wpt_status WLANDXE_TxFrame
 
   @  Parameters
       pDXEContext : DXE Control Block
+      ucTxResReq          TX resource number required by TL/WDI
 
   @  Return
       wpt_status
@@ -281,7 +311,8 @@ wpt_status WLANDXE_TxFrame
 wpt_status
 WLANDXE_CompleteTX
 (
-  void* pDXEContext
+  void* pDXEContext,
+  wpt_uint32 ucTxResReq
 );
 
 /*==========================================================================
@@ -364,6 +395,24 @@ wpt_status WLANDXE_SetPowerState
 );
 
 /*==========================================================================
+  @  Function Name 
+      WLANDXE_GetFreeTxDataResNumber
+
+  @  Description 
+      Returns free descriptor numbers for TX data channel (TX high priority)
+
+  @  Parameters
+      pVoid            pDXEContext : DXE Control Block
+
+  @  Return
+      wpt_uint32      Free descriptor number of TX high pri ch
+===========================================================================*/
+wpt_uint32 WLANDXE_GetFreeTxDataResNumber
+(
+   void *pDXEContext
+);
+
+/*==========================================================================
   @  Function Name
     WLANDXE_ChannelDebug
 
@@ -373,7 +422,7 @@ wpt_status WLANDXE_SetPowerState
     Or if host driver detects any abnormal stcuk may display
 
   @  Parameters
-    displaySnapshot : Dispaly DXE snapshot option
+    displaySnapshot : Display DXE snapshot option
     enableStallDetect : Enable stall detect feature
                         This feature will take effect to data performance
                         Not integrate till fully verification
@@ -385,7 +434,7 @@ wpt_status WLANDXE_SetPowerState
 void WLANDXE_ChannelDebug
 (
    wpt_boolean    displaySnapshot,
-   wpt_boolean    enableStallDetect
+   wpt_boolean    enableStallDetect   
 );
 
 #ifdef WLANDXE_TEST_CHANNEL_ENABLE

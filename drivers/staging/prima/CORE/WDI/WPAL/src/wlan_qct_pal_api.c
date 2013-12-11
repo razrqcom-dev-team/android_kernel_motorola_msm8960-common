@@ -18,6 +18,26 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
 
 /**=========================================================================
   
@@ -95,7 +115,7 @@ wpt_status wpalOpen(void **ppPalContext, void *pOSContext)
    {
       WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_FATAL,
                  "%s: wpalDeviceInit failed with status %u",
-                 __FUNCTION__, status);
+                 __func__, status);
    }
 
    return status;
@@ -214,7 +234,7 @@ void *wpalDmaMemoryAllocate(wpt_uint32 size, void **ppPhysicalAddr)
    if ( NULL == pv ) 
    {
      WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_ERROR, 
-                 "%s Unable to allocate DMA buffer\n", __FUNCTION__);
+                 "%s Unable to allocate DMA buffer\n", __func__);
      return NULL;
    }
 
@@ -368,10 +388,10 @@ wpt_status wpalRivaSubystemRestart(void)
     {
          WPAL_TRACE(eWLAN_MODULE_PAL, eWLAN_PAL_TRACE_LEVEL_FATAL,
                  "%s: loading/unloading in progress,"
-                 " SSR will be done at the end of unload", __FUNCTION__);
+                 " SSR will be done at the end of unload", __func__);
          return eWLAN_PAL_STATUS_E_FAILURE;
     }
-    if (0 == subsystem_restart("riva")) 
+    if (0 == subsystem_restart("wcnss")) 
     {
         return eWLAN_PAL_STATUS_SUCCESS;
     }
@@ -402,6 +422,27 @@ void wpalWlanReload(void)
 ---------------------------------------------------------------------------*/
 void wpalWcnssResetIntr(void)
 {
+#ifdef HAVE_WCNSS_RESET_INTR
    wcnss_reset_intr();
+#endif
+   return;
+}
+
+/*---------------------------------------------------------------------------
+    wpalFwDumpReq -  Trigger the dump commands to Firmware
+
+    Param:
+       cmd - Command No. to execute
+       arg1 - argument 1 to cmd
+       arg2 - argument 2 to cmd
+       arg3 - argument 3 to cmd
+       arg4 - argument 4 to cmd
+    Return:
+       NONE
+---------------------------------------------------------------------------*/
+void wpalFwDumpReq(wpt_uint32 cmd, wpt_uint32 arg1, wpt_uint32 arg2,
+                    wpt_uint32 arg3, wpt_uint32 arg4)
+{
+   vos_fwDumpReq(cmd, arg1, arg2, arg3, arg4);
    return;
 }

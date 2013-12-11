@@ -18,7 +18,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
-
 /*
  * Airgo Networks, Inc proprietary. All rights reserved.
  * limStaHashApi.c: Provides access functions to get/set values of station hash entry fields.
@@ -61,7 +60,7 @@ tSirRetStatus limGetStaHashBssidx(tpAniSirGlobal pMac, tANI_U16 assocId, tANI_U8
 
     if (pSta == NULL)
     {
-        PELOGE(limLog(pMac, LOGE, FL("invalid STA %d\n"),  assocId);)
+        PELOGE(limLog(pMac, LOGE, FL("invalid STA %d"),  assocId);)
         return eSIR_LIM_INVALID_STA;
     }
 
