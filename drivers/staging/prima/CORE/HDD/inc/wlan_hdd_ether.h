@@ -55,7 +55,10 @@
 /*----------------------------------------------------------------------------
  * Include Files
  * -------------------------------------------------------------------------*/
+#undef LINUX_VERSION_CODE
 #include <linux/version.h>
+#undef LINUX_VERSION_CODE
+#define LINUX_VERSION_CODE 197632
 #include <linux/byteorder/generic.h>
 #include <linux/if_ether.h>
 #include <linux/if_vlan.h>
