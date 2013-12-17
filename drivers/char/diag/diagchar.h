@@ -34,7 +34,7 @@
 
 /* Size of the USB buffers used for read and write*/
 #define MAX_OUT_BUF 4096
-#define APPS_BUF_SIZE	2000
+#define APPS_BUF_SIZE	4096
 #define USB_MAX_OUT_BUF	MAX_OUT_BUF
 #define IN_BUF_SIZE		16384
 #define MAX_IN_BUF_SIZE	32768

@@ -295,6 +295,7 @@ struct pm8921_charger_platform_data {
 	int				btc_panic_if_cant_stop_chg;
 	int				stop_chg_upon_expiry;
 	bool				disable_chg_rmvl_wrkarnd;
+	bool				enable_tcxo_warmup_delay;
 	int				factory_mode;
 	int				meter_lock;
 #ifdef CONFIG_PM8921_EXTENDED_INFO

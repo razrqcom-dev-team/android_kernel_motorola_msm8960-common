@@ -312,6 +312,8 @@ struct pm8921_chg_chip {
 	bool				disable_aicl;
 	int				usb_type;
 	bool				disable_chg_rmvl_wrkarnd;
+	bool				enable_tcxo_warmup_delay;
+	struct msm_xo_voter		*voter;
 	int				factory_mode;
 	int				meter_lock;
 #ifdef CONFIG_PM8921_EXTENDED_INFO
@@ -3005,8 +3007,7 @@ static irqreturn_t usbin_valid_irq_handler(int irq, void *data)
 {
 	if (usb_target_ma)
 		schedule_delayed_work(&the_chip->vin_collapse_check_work,
-				      round_jiffies_relative(msecs_to_jiffies
-						(VIN_MIN_COLLAPSE_CHECK_MS)));
+			      msecs_to_jiffies(VIN_MIN_COLLAPSE_CHECK_MS));
 	else
 	    handle_usb_insertion_removal(data);
 	return IRQ_HANDLED;
@@ -4604,10 +4605,15 @@ err_out:
 	return -EINVAL;
 }
 
+#define TCXO_WARMUP_DELAY_MS	4
 static void pm8921_chg_force_19p2mhz_clk(struct pm8921_chg_chip *chip)
 {
 	int err;
 	u8 temp;
+
+	msm_xo_mode_vote(chip->voter, MSM_XO_MODE_ON);
+	if (chip->enable_tcxo_warmup_delay)
+		msleep(TCXO_WARMUP_DELAY_MS);
 
 	temp  = 0xD1;
 	err = pm_chg_write(chip, CHG_TEST, temp);
@@ -4667,12 +4673,18 @@ static void pm8921_chg_force_19p2mhz_clk(struct pm8921_chg_chip *chip)
 		pr_err("Error %d writing %d to addr %d\n", err, temp, CHG_TEST);
 		return;
 	}
+
+	msm_xo_mode_vote(chip->voter, MSM_XO_MODE_OFF);
 }
 
 static void pm8921_chg_set_hw_clk_switching(struct pm8921_chg_chip *chip)
 {
 	int err;
 	u8 temp;
+
+	msm_xo_mode_vote(chip->voter, MSM_XO_MODE_ON);
+	if (chip->enable_tcxo_warmup_delay)
+		msleep(TCXO_WARMUP_DELAY_MS);
 
 	temp  = 0xD1;
 	err = pm_chg_write(chip, CHG_TEST, temp);
@@ -4687,6 +4699,7 @@ static void pm8921_chg_set_hw_clk_switching(struct pm8921_chg_chip *chip)
 		pr_err("Error %d writing %d to addr %d\n", err, temp, CHG_TEST);
 		return;
 	}
+	msm_xo_mode_vote(chip->voter, MSM_XO_MODE_OFF);
 }
 
 #define VREF_BATT_THERM_FORCE_ON	BIT(7)
@@ -6108,6 +6121,7 @@ static int __devinit pm8921_charger_probe(struct platform_device *pdev)
 	chip->thermal_mitigation = pdata->thermal_mitigation;
 	chip->thermal_levels = pdata->thermal_levels;
 	chip->disable_chg_rmvl_wrkarnd = pdata->disable_chg_rmvl_wrkarnd;
+	chip->enable_tcxo_warmup_delay = pdata->enable_tcxo_warmup_delay;
 
 	chip->factory_mode = pdata->factory_mode;
 	chip->meter_lock = pdata->meter_lock;
@@ -6145,6 +6159,7 @@ static int __devinit pm8921_charger_probe(struct platform_device *pdev)
 	chip->ibatmax_max_adj_ma = find_ibat_max_adj_ma(
 					chip->max_bat_chg_current);
 
+	chip->voter = msm_xo_get(MSM_XO_TCXO_D0, "pm8921_charger");
 	rc = pm8921_chg_hw_init(chip);
 	if (rc) {
 		pr_err("couldn't init hardware rc=%d\n", rc);
