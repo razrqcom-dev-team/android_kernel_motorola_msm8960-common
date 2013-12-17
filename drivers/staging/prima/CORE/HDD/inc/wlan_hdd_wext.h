@@ -42,10 +42,7 @@
 #ifndef __WEXT_IW_H__
 #define __WEXT_IW_H__
 
-#undef LINUX_VERSION_CODE
 #include <linux/version.h>
-#undef LINUX_VERSION_CODE
-#define LINUX_VERSION_CODE 197632
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/wireless.h>

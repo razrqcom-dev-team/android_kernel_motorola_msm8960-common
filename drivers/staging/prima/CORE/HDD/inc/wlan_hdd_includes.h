@@ -62,10 +62,7 @@
 
 // throw all the includes in here f to get the .c files  in the HDD to compile.
 
-#undef LINUX_VERSION_CODE
 #include <linux/version.h>
-#undef LINUX_VERSION_CODE
-#define LINUX_VERSION_CODE 197632
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
