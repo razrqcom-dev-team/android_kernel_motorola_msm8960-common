@@ -1292,11 +1292,8 @@ int hdd_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
            vos_mem_copy(finalBuf + 24, buf, bufLen);
 
            wlan_hdd_action( NULL, dev, &chan, 0, NL80211_CHAN_HT20,
-                       1, dwellTime, finalBuf, finalLen,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
-                       1, 1,
-#endif
-                       &cookie );
+                       1, dwellTime, finalBuf, finalLen,  1,
+                       1, &cookie );
            vos_mem_free(finalBuf);
        }
        else if (strncmp(command, "SETWESMODE", 10) == 0)
