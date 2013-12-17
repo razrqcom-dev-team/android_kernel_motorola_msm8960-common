@@ -3215,7 +3215,7 @@ void wlan_hdd_release_intf_addr(hdd_context_t* pHddCtx, tANI_U8* releaseAddr)
       .ndo_set_mac_address = hdd_set_mac_address,
       .ndo_select_queue    = hdd_select_queue,
 #ifdef WLAN_FEATURE_PACKET_FILTERING
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,1,0))
+#if defined(WIRELESS_3_4) || (LINUX_VERSION_CODE > KERNEL_VERSION(3,1,0))
       .ndo_set_rx_mode = hdd_set_multicast_list,
 #else
       .ndo_set_multicast_list = hdd_set_multicast_list,

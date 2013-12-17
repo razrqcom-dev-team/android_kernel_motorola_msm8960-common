@@ -338,7 +338,7 @@ wlan_hdd_txrx_stypes[NUM_NL80211_IFTYPES] = {
     },
 };
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+#if defined(WIRELESS_3_4) || (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
 static const struct ieee80211_iface_limit
 wlan_hdd_iface_limit[] = {
     {
@@ -611,7 +611,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
        wiphy->flags |=   WIPHY_FLAG_DISABLE_BEACON_HINTS;
        wiphy->flags |=   WIPHY_FLAG_STRICT_REGULATORY;
     }
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+#if defined(WIRELESS_3_4) || (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
     wiphy->flags |= WIPHY_FLAG_HAVE_AP_SME
                  |  WIPHY_FLAG_AP_PROBE_RESP_OFFLOAD
                  |  WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL
@@ -664,7 +664,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
                              | BIT(NL80211_IFTYPE_P2P_GO)
                              | BIT(NL80211_IFTYPE_AP);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+#if defined(WIRELESS_3_4) || (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
     if( pCfg->enableMCC )
     {
         /* Currently, supports up to two channels */
@@ -954,7 +954,7 @@ void wlan_hdd_cfg80211_set_key_wapi(hdd_adapter_t* pAdapter, u8 key_index,
 }
 #endif /* FEATURE_WLAN_WAPI*/
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
                                        beacon_data_t **ppBeacon,
                                        struct beacon_parameters *params)
@@ -1002,7 +1002,7 @@ int wlan_hdd_cfg80211_alloc_new_beacon(hdd_adapter_t *pAdapter,
     if( beacon == NULL )
         return -ENOMEM;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
     if(params->dtim_period || !old )
         beacon->dtim_period = params->dtim_period;
     else
@@ -1188,7 +1188,7 @@ static int wlan_hdd_add_ie(hdd_adapter_t* pHostapdAdapter, v_U8_t *genie,
     return 0;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 static int wlan_hdd_cfg80211_update_apies(hdd_adapter_t* pHostapdAdapter,
                             struct beacon_parameters *params)
 #else
@@ -1735,7 +1735,7 @@ VOS_STATUS wlan_sap_select_cbmode(void *pAdapter,eSapPhyMode SapHw_mode, v_U8_t 
     return VOS_STATUS_SUCCESS;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
                             struct beacon_parameters *params)
 #else
@@ -1955,7 +1955,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
     pConfig->SSIDinfo.ssidHidden = VOS_FALSE;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
     if (params->ssid != NULL)
     {
         memcpy(pConfig->SSIDinfo.ssid.ssId, params->ssid, params->ssid_len);
@@ -2147,7 +2147,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
    return 0;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 static int wlan_hdd_cfg80211_add_beacon(struct wiphy *wiphy,
                                         struct net_device *dev,
                                         struct beacon_parameters *params)
@@ -2252,7 +2252,7 @@ static int wlan_hdd_cfg80211_set_beacon(struct wiphy *wiphy,
 
 #endif //(LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 static int wlan_hdd_cfg80211_del_beacon(struct wiphy *wiphy,
                                         struct net_device *dev)
 #else
@@ -2394,7 +2394,7 @@ static int wlan_hdd_cfg80211_stop_ap (struct wiphy *wiphy,
     return status;
 }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0))
+#if defined(WIRELESS_3_4) || (LINUX_VERSION_CODE > KERNEL_VERSION(3,3,0))
 
 static int wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
                                       struct net_device *dev,
@@ -4352,7 +4352,8 @@ hddPrintPmkId(tANI_U8 *pmkId, tANI_U8 logLevel)
         hddLog(VOS_TRACE_LEVEL_INFO, "\n"); \
     }
 
-#if defined(FEATURE_WLAN_LFR) && (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+#ifdef FEATURE_WLAN_LFR
+#if defined(WIRELESS_3_4) || (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
 /*
  * FUNCTION: wlan_hdd_cfg80211_pmksa_candidate_notify
  * This function is used to notify the supplicant of a new PMKSA candidate.
@@ -4383,6 +4384,7 @@ int wlan_hdd_cfg80211_pmksa_candidate_notify(
 #endif  /* FEATURE_WLAN_OKC */
     return 0;
 }
+#endif //version >= 3.4
 #endif //FEATURE_WLAN_LFR
 
 #ifdef FEATURE_WLAN_LFR_METRICS
@@ -7039,7 +7041,7 @@ static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 }
 #endif //LINUX_VERSION_CODE
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+#if defined(WIRELESS_3_4) || (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
 static int wlan_hdd_set_txq_params(struct wiphy *wiphy,
                    struct net_device *dev,
                    struct ieee80211_txq_params *params)
@@ -8396,7 +8398,7 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops =
     .del_virtual_intf = wlan_hdd_del_virtual_intf,
     .change_virtual_intf = wlan_hdd_cfg80211_change_iface,
     .change_station = wlan_hdd_change_station,
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
     .add_beacon = wlan_hdd_cfg80211_add_beacon,
     .del_beacon = wlan_hdd_cfg80211_del_beacon,
     .set_beacon = wlan_hdd_cfg80211_set_beacon,

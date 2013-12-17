@@ -356,7 +356,7 @@ static int BSL_Close (struct hci_dev *hdev);
 static int BSL_Flush(struct hci_dev *hdev);
 static int BSL_IOControl(struct hci_dev *hdev, unsigned int cmd, unsigned long arg);
 static int BSL_Write(struct sk_buff *skb);
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 static void BSL_Destruct(struct hci_dev *hdev);
 #endif
 
@@ -3799,7 +3799,7 @@ int BSL_Init ( v_PVOID_t  pvosGCtx )
     hdev->close    = BSL_Close;
     hdev->flush    = BSL_Flush;
     hdev->send     = BSL_Write;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
     hdev->destruct = BSL_Destruct;
     hdev->owner = THIS_MODULE;
 #endif
@@ -4065,7 +4065,7 @@ static int BSL_Flush(struct hci_dev *hdev)
   @return
   TRUE indicates success. FALSE indicates failure.
 */
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 static void BSL_Destruct(struct hci_dev *hdev)
 {
     VOS_TRACE( VOS_MODULE_ID_BAP, VOS_TRACE_LEVEL_INFO_HIGH, "BSL_Destruct - not supported");
@@ -4450,7 +4450,7 @@ VOS_STATUS WLANBAP_RegisterWithHCI(hdd_adapter_t *pAdapter)
     hdev->close    = BSL_Close;
     hdev->flush    = BSL_Flush;
     hdev->send     = BSL_Write;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+#if !defined(WIRELESS_3_4) && (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
     hdev->owner = THIS_MODULE;
     hdev->destruct = BSL_Destruct;
 #endif
